@@ -1,0 +1,19 @@
+[package]
+name = "robot-simulation-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.15.1"
+bevy-inspector-egui = "0.28.1"
+bevy_egui = "0.32.0"
+bevy_flycam = "0.15.0"
+bevy_rapier3d = "0.28.0"
+bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier"] }
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
+
