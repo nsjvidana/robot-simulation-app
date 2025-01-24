@@ -10,10 +10,15 @@ bevy_egui = "0.32.0"
 bevy_flycam = "0.15.0"
 bevy_rapier3d = "0.28.0"
 bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier"] }
+parking_lot = "0.12.3"
+
+[dependencies.k]
+git = "https://github.com/nsjvidana/k.git"
+rev = "978e01f"
+version = "0.32.0"
 
 [profile.dev.package."*"]
 opt-level = 3
 
 [profile.dev]
 opt-level = 1
-
