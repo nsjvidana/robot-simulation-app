@@ -1,26 +1,55 @@
+use std::path::Path;
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
-use bevy_flycam::FlyCam;
+use bevy::prelude::{ButtonInput, KeyCode, Query, Res, Startup, Update, With};
+use bevy_egui::EguiPlugin;
+use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
 use math::Real;
+use std::fs;
+use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, WriteDefaultRapierContext};
 
 // mod error;
 mod kinematics;
 mod math;
+mod ui;
 
 fn main() {
-    let mut app = App::new()
-        .add_plugins((
-            DefaultPlugins,
-            RapierPhysicsPlugin::<()>::default(),
-            SalvaPhysicsPlugin::new()
-        ));
+    let mut app = App::new();
+    app.add_plugins((
+        DefaultPlugins,
+        RapierPhysicsPlugin::<()>::default().in_fixed_schedule(),
+        RapierDebugRenderPlugin::default(),
+        SalvaPhysicsPlugin::new(),
+        EguiPlugin,
+        NoCameraPlayerPlugin,
+    ));
+
+    app.add_systems(Startup, startup);
+    app.add_systems(Update, (
+        ui::ik_sandbox_ui,
+        // update
+    ));
+
+    app.run();
 }
 
 #[derive(Component)]
 pub struct TestComponent {
     pub chain: SerialChain<Real>,
+}
+
+pub fn update(
+    mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
+    keys: Res<ButtonInput<KeyCode>>,
+) {
+    if keys.just_pressed(KeyCode::KeyP) {
+        rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = true;
+    }
+    else {
+        rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = false;
+    }
 }
 
 pub fn startup(

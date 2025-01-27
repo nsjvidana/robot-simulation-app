@@ -1,4 +1,4 @@
-use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JointType, SerialChain, Vector3};
+use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JacobianIkSolver, JointType, SerialChain, Vector3};
 use crate::math::{angle_to, project_onto_plane, Real};
 
 macro_rules! cyclic_impl {
