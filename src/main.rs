@@ -1,6 +1,6 @@
 use std::path::Path;
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
-use bevy::prelude::{ButtonInput, KeyCode, Query, Res, Startup, Update, With};
+use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
 use bevy_egui::EguiPlugin;
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
@@ -8,12 +8,14 @@ use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
 use math::Real;
 use std::fs;
+use bevy_rapier3d::plugin::PhysicsSet;
 use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, WriteDefaultRapierContext};
 
-// mod error;
 mod kinematics;
 mod math;
 mod ui;
+mod urdf;
+mod convert;
 
 fn main() {
     let mut app = App::new();
@@ -31,6 +33,8 @@ fn main() {
         ui::ik_sandbox_ui,
         // update
     ));
+
+    app.add_systems(FixedUpdate, urdf::init_robots.before(PhysicsSet::SyncBackend));
 
     app.run();
 }

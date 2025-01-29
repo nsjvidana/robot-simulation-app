@@ -1,14 +1,16 @@
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
-use bevy::prelude::Local;
+use bevy::prelude::{Commands, Local};
 use bevy::ptr::UnsafeCellDeref;
 use bevy_egui::egui::ComboBox;
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::WriteDefaultRapierContext;
 use k::{InverseKinematicsSolver, SerialChain};
-use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobot};
+use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cell::UnsafeCell;
+use bevy::ecs::system::lifetimeless::SCommands;
 use bevy_rapier3d::parry::math::{Isometry, Vector};
+use crate::urdf::UrdfRobot;
 
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,
@@ -57,7 +59,7 @@ pub fn ik_sandbox_ui(
     mut ctxs: EguiContexts,
     mut ui_data: Local<IKSandboxUI>,
     mut ui_state: Local<IKSandboxUIState>,
-    mut rapier_ctx: WriteDefaultRapierContext,
+    mut commands: Commands
 ) {
     egui::Window::new("Robot Sandbox").show(
         ctxs.ctx_mut(), |ui| {
@@ -71,20 +73,13 @@ pub fn ik_sandbox_ui(
                 let button = ui.button("Import URDF file");
                 if button.clicked() { //import urdf robot via file dialog
                     let dialog = rfd::FileDialog::new()
-                        .add_filter("Robot Description", &["urdf"])
+                        .add_filter("Robot Description", &["urdf", "URDF"])
                         .pick_file();
                     if let Some(path) = dialog {
-                        let (robot, _) = UrdfRobot::from_file(path, ui_state.urdf_loader_options.clone(), None).unwrap();
-                        unsafe {
-                            let mut unsafe_ctx = UnsafeCell::new(rapier_ctx);
-                            //TODO: use robot handles to make the rapier entities.
-                            let _robot_handles = robot.insert_using_multibody_joints(
-                                &mut unsafe_ctx.deref_mut().bodies,
-                                &mut unsafe_ctx.deref_mut().colliders,
-                                &mut unsafe_ctx.deref_mut().multibody_joints,
-                                UrdfMultibodyOptions::DISABLE_SELF_CONTACTS
-                            );
-                        }
+                        let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(path, ui_state.urdf_loader_options.clone(), None).unwrap();
+                        commands.spawn(UrdfRobot::from(robot)
+                            .with_multibody_joints()
+                        );
                     }
                 }
             });
