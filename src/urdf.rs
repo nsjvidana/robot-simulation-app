@@ -1,5 +1,5 @@
 use crate::convert::IntoBevy;
-use bevy::prelude::{Commands, Component, Entity, Query, Transform, With, Without};
+use bevy::{prelude::{Commands, Component, Entity, Parent, Query, Transform, With, Without}, hierarchy::BuildChildren};
 use bevy_rapier3d::geometry::SolverGroups;
 use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierContextEntityLink, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
 use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
@@ -97,10 +97,11 @@ pub fn init_robots(
                     },
                 }
             }
+            let link_ent = link_ent.id();
 
             //Adding link colliders
             for collider in colliders.iter() {
-                let mut coll_ent = commands.spawn((
+                let mut coll_ent_cmd = commands.spawn((
                     //ColliderShape
                     bevy_rapier3d::prelude::Collider::from(collider.shared_shape().clone()),
                     //ColliderMassProps
@@ -132,17 +133,17 @@ pub fn init_robots(
                     collider.active_hooks().into_bevy(),
                     collider.active_events().into_bevy(),
 
-                    context_link
+                    context_link,
                 ));
                 //ColliderType
-                if collider.is_sensor() { coll_ent.insert(Sensor); }
+                if collider.is_sensor() { coll_ent_cmd.insert(Sensor); }
                 //ColliderFlags::enabled
-                if !collider.is_enabled() { coll_ent.insert(ColliderDisabled); }
+                if !collider.is_enabled() { coll_ent_cmd.insert(ColliderDisabled); }
+                coll_ent_cmd.set_parent(link_ent);
             }
 
             //TODO: add joints
         }
-
         commands.entity(entity).insert(RobotEntities);
     }
 }
