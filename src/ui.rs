@@ -78,7 +78,7 @@ pub fn ik_sandbox_ui(
                     if let Some(path) = dialog {
                         let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(path, ui_state.urdf_loader_options.clone(), None).unwrap();
                         commands.spawn(UrdfRobot::from(robot)
-                            .with_multibody_joints()
+                            .with_multibody_joints(UrdfMultibodyOptions::default())
                         );
                     }
                 }

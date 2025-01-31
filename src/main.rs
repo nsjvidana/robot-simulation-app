@@ -47,6 +47,7 @@ pub struct TestComponent {
 pub fn update(
     mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<bevy::prelude::Time>
 ) {
     if keys.just_pressed(KeyCode::KeyP) {
         rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = true;

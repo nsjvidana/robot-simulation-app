@@ -1,9 +1,10 @@
 use crate::convert::IntoBevy;
 use bevy::{prelude::{Commands, Component, Entity, Parent, Query, Transform, With, Without}, hierarchy::BuildChildren};
+use bevy::ptr::UnsafeCellDeref;
 use bevy_rapier3d::geometry::SolverGroups;
-use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierContextEntityLink, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
+use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, Collider, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
 use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
-use rapier3d_urdf::{UrdfJoint, UrdfLink};
+use rapier3d_urdf::{UrdfJoint, UrdfLink, UrdfLoaderOptions, UrdfMultibodyOptions};
 
 #[derive(Component)]
 pub struct UrdfRobot {
@@ -15,7 +16,8 @@ pub struct UrdfRobot {
     ///
     /// This vector matches the order of [`Robot::joints`].
     pub joints: Vec<UrdfJoint>,
-    pub robot_joint_type: RobotJointType
+    pub robot_joint_type: RobotJointType,
+    pub import_options: UrdfLoaderOptions
 }
 
 impl UrdfRobot {
@@ -24,8 +26,8 @@ impl UrdfRobot {
         self
     }
 
-    pub fn with_multibody_joints(mut self) -> Self {
-        self.robot_joint_type = RobotJointType::MultibodyJoints;
+    pub fn with_multibody_joints(mut self, joint_options: UrdfMultibodyOptions) -> Self {
+        self.robot_joint_type = RobotJointType::MultibodyJoints(joint_options);
         self
     }
 }
@@ -35,14 +37,15 @@ impl From<rapier3d_urdf::UrdfRobot> for UrdfRobot {
         Self {
             links: value.links,
             joints: value.joints,
-            robot_joint_type: RobotJointType::ImpulseJoints
+            robot_joint_type: RobotJointType::ImpulseJoints,
+            import_options: UrdfLoaderOptions::default(),
         }
     }
 }
 
 pub enum RobotJointType {
     ImpulseJoints,
-    MultibodyJoints,
+    MultibodyJoints(UrdfMultibodyOptions),
 }
 
 //TODO: Add system that deals with this struct
@@ -52,7 +55,8 @@ pub struct RobotEntities;
 pub fn init_robots(
     mut commands: Commands,
     robot_q: Query<(Entity, &UrdfRobot, Option<&RapierContextEntityLink>), Without<RobotEntities>>,
-    default_context_q: Query<Entity, With<DefaultRapierContext>>
+    default_context_q: Query<Entity, With<DefaultRapierContext>>,
+    mut context_q: Query<&mut RapierContext>,
 ) {
     //TODO: parallelize this?
     for (entity, robot, ctx_link) in robot_q.iter() {
@@ -62,88 +66,110 @@ pub fn init_robots(
                 |link| link.0
             )
         );
-        for UrdfLink { body, colliders } in robot.links.iter() {
-            //set rigid body data
-            let mut link_ent = commands.spawn((
-                RigidBody::from(body.body_type()),
-                Transform::from_translation(body.position().translation.into())
-                    .with_rotation(body.position().rotation.into()),
-                Damping {
-                    linear_damping: body.linear_damping(),
-                    angular_damping: body.angular_damping()
-                },
-                GravityScale(body.gravity_scale()),
-                Ccd { enabled: body.is_ccd_enabled() },
-                Sleeping {
-                    sleeping: body.activation().sleeping,
-                    normalized_linear_threshold: body.activation().normalized_linear_threshold,
-                    angular_threshold: body.activation().angular_threshold,
-                },
-                Dominance::group(body.dominance_group()),
-                AdditionalSolverIterations(body.additional_solver_iterations()),
 
+        let unsafe_ctx = std::cell::UnsafeCell::new(
+            context_q.get_mut(context_link.0).unwrap()
+        );
+        let handles = unsafe {
+            let robo = rapier3d_urdf::UrdfRobot {
+                links: robot.links.clone(),
+                joints: robot.joints.clone(),
+            };
+            robo.insert_using_impulse_joints(
+                &mut unsafe_ctx.deref_mut().bodies,
+                &mut unsafe_ctx.deref_mut().colliders,
+                &mut unsafe_ctx.deref_mut().impulse_joints,
+            )
+        };
+        let context = unsafe { unsafe_ctx.deref_mut() };
+
+        //Spawning link & collider entities
+        for link in handles.links.iter() {
+            let rb = context.bodies.get_mut(link.body).unwrap();
+            let mut rb_ent = commands.spawn((
+                RigidBody::from(rb.body_type()),
+                Transform::from_translation(rb.position().translation.into())
+                    .with_rotation(rb.position().rotation.into()),
+                Damping {
+                    linear_damping: rb.linear_damping(),
+                    angular_damping: rb.angular_damping()
+                },
+                GravityScale(rb.gravity_scale()),
+                Ccd { enabled: rb.is_ccd_enabled() },
+                Sleeping {
+                    sleeping: rb.activation().sleeping,
+                    normalized_linear_threshold: rb.activation().normalized_linear_threshold,
+                    angular_threshold: rb.activation().angular_threshold,
+                },
+                Dominance::group(rb.dominance_group()),
+                AdditionalSolverIterations(rb.additional_solver_iterations()),
+
+                RapierRigidBodyHandle(link.body),
                 context_link
             ));
-            if !body.is_enabled() { link_ent.insert(RigidBodyDisabled); }
-            if let Some(additional_mprops) = &body.mass_properties().additional_local_mprops {
+            if !rb.is_enabled() { rb_ent.insert(RigidBodyDisabled); }
+            if let Some(additional_mprops) = &rb.mass_properties().additional_local_mprops {
                 match *(*additional_mprops) {
                     RigidBodyAdditionalMassProps::MassProps(mprops) => {
-                        link_ent.insert(
+                        rb_ent.insert(
                             AdditionalMassProperties::MassProperties(MassProperties::from_rapier(mprops))
                         );
                     },
                     RigidBodyAdditionalMassProps::Mass(mass) => {
-                        link_ent.insert(AdditionalMassProperties::Mass(mass));
+                        rb_ent.insert(AdditionalMassProperties::Mass(mass));
                     },
                 }
             }
-            let link_ent = link_ent.id();
+            rb.user_data = rb_ent.id().to_bits() as u128;
+            let rb_ent = rb_ent.id();
 
-            //Adding link colliders
-            for collider in colliders.iter() {
-                let mut coll_ent_cmd = commands.spawn((
+            //spawning colliders
+            for coll_handle in link.colliders.iter() {
+                let coll = context.colliders.get_mut(*coll_handle).unwrap();
+                let mut coll_ent = commands.spawn((
                     //ColliderShape
-                    bevy_rapier3d::prelude::Collider::from(collider.shared_shape().clone()),
+                    bevy_rapier3d::prelude::Collider::from(coll.shared_shape().clone()),
                     //ColliderMassProps
                     ColliderMassProperties::MassProperties(
-                        MassProperties::from_rapier(collider.mass_properties())
+                        MassProperties::from_rapier(coll.mass_properties())
                     ),
                     //ColliderPosition
-                    Transform::from_translation(collider.position().translation.into())
-                        .with_rotation(collider.position().rotation.into()),
+                    Transform::from_translation(coll.position().translation.into())
+                        .with_rotation(coll.position().rotation.into()),
                     //ColliderMaterial
                     Friction {
-                        coefficient: collider.friction(),
-                        combine_rule: collider.friction_combine_rule().into_bevy()
+                        coefficient: coll.friction(),
+                        combine_rule: coll.friction_combine_rule().into_bevy()
                     },
                     Restitution {
-                        coefficient: collider.restitution(),
-                        combine_rule: collider.restitution_combine_rule().into_bevy()
+                        coefficient: coll.restitution(),
+                        combine_rule: coll.restitution_combine_rule().into_bevy()
                     },
                     //ColliderFlags
-                    collider.active_collision_types().into_bevy(),
+                    coll.active_collision_types().into_bevy(),
                     CollisionGroups {
-                        filters: collider.collision_groups().filter.into_bevy(),
-                        memberships: collider.collision_groups().memberships.into_bevy(),
+                        filters: coll.collision_groups().filter.into_bevy(),
+                        memberships: coll.collision_groups().memberships.into_bevy(),
                     },
                     SolverGroups {
-                        filters: collider.solver_groups().filter.into_bevy(),
-                        memberships: collider.solver_groups().memberships.into_bevy(),
+                        filters: coll.solver_groups().filter.into_bevy(),
+                        memberships: coll.solver_groups().memberships.into_bevy(),
                     },
-                    collider.active_hooks().into_bevy(),
-                    collider.active_events().into_bevy(),
+                    coll.active_hooks().into_bevy(),
+                    coll.active_events().into_bevy(),
 
+                    RapierColliderHandle(*coll_handle),
                     context_link,
                 ));
                 //ColliderType
-                if collider.is_sensor() { coll_ent_cmd.insert(Sensor); }
+                if coll.is_sensor() { coll_ent.insert(Sensor); }
                 //ColliderFlags::enabled
-                if !collider.is_enabled() { coll_ent_cmd.insert(ColliderDisabled); }
-                coll_ent_cmd.set_parent(link_ent);
+                if !coll.is_enabled() { coll_ent.insert(ColliderDisabled); }
+                coll_ent.set_parent(rb_ent);
+                coll.user_data = coll_ent.id().to_bits() as u128;
             }
-
-            //TODO: add joints
         }
         commands.entity(entity).insert(RobotEntities);
+        //TODO: add joints
     }
 }
