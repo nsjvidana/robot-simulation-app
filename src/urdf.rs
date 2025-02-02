@@ -8,14 +8,7 @@ use rapier3d_urdf::{UrdfJoint, UrdfLink, UrdfLoaderOptions, UrdfMultibodyOptions
 
 #[derive(Component)]
 pub struct UrdfRobot {
-    /// The bodies and colliders loaded from the urdf file.
-    ///
-    /// This vector matches the order of [`Robot::links`]
-    pub links: Vec<UrdfLink>,
-    /// The joints loaded from the urdf file.
-    ///
-    /// This vector matches the order of [`Robot::joints`].
-    pub joints: Vec<UrdfJoint>,
+    pub rapier_urdf_robot: rapier3d_urdf::UrdfRobot,
     pub robot_joint_type: RobotJointType,
     pub import_options: UrdfLoaderOptions
 }
@@ -35,8 +28,7 @@ impl UrdfRobot {
 impl From<rapier3d_urdf::UrdfRobot> for UrdfRobot {
     fn from(value: rapier3d_urdf::UrdfRobot) -> Self {
         Self {
-            links: value.links,
-            joints: value.joints,
+            rapier_urdf_robot: value,
             robot_joint_type: RobotJointType::ImpulseJoints,
             import_options: UrdfLoaderOptions::default(),
         }
@@ -71,11 +63,7 @@ pub fn init_robots(
             context_q.get_mut(context_link.0).unwrap()
         );
         let handles = unsafe {
-            let robo = rapier3d_urdf::UrdfRobot {
-                links: robot.links.clone(),
-                joints: robot.joints.clone(),
-            };
-            robo.insert_using_impulse_joints(
+            robot.rapier_urdf_robot.clone().insert_using_impulse_joints(
                 &mut unsafe_ctx.deref_mut().bodies,
                 &mut unsafe_ctx.deref_mut().colliders,
                 &mut unsafe_ctx.deref_mut().impulse_joints,

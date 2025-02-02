@@ -76,7 +76,11 @@ pub fn ik_sandbox_ui(
                         .add_filter("Robot Description", &["urdf", "URDF"])
                         .pick_file();
                     if let Some(path) = dialog {
-                        let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(path, ui_state.urdf_loader_options.clone(), None).unwrap();
+                        let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
+                            path,
+                            ui_state.urdf_loader_options.clone(),
+                            None
+                        ).unwrap();
                         commands.spawn(UrdfRobot::from(robot)
                             .with_multibody_joints(UrdfMultibodyOptions::default())
                         );
