@@ -1,10 +1,14 @@
+use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use crate::convert::IntoBevy;
 use bevy::{prelude::{Commands, Component, Entity, Parent, Query, Transform, With, Without}, hierarchy::BuildChildren};
 use bevy::ptr::UnsafeCellDeref;
 use bevy_rapier3d::geometry::SolverGroups;
 use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, Collider, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
-use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
-use rapier3d_urdf::{UrdfJoint, UrdfLink, UrdfLoaderOptions, UrdfMultibodyOptions};
+use bevy_rapier3d::rapier::data::Index;
+use bevy_rapier3d::rapier::dynamics::ImpulseJointHandle;
+use bevy_rapier3d::rapier::prelude::{RigidBodyAdditionalMassProps, RigidBodyHandle};
+use rapier3d_urdf::{UrdfJoint, UrdfJointHandle, UrdfLink, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobotHandles};
 
 #[derive(Component)]
 pub struct UrdfRobot {
@@ -59,15 +63,58 @@ pub fn init_robots(
             )
         );
 
-        let unsafe_ctx = std::cell::UnsafeCell::new(
+        let unsafe_ctx = UnsafeCell::new(
             context_q.get_mut(context_link.0).unwrap()
         );
-        let handles = unsafe {
-            robot.rapier_urdf_robot.clone().insert_using_impulse_joints(
-                &mut unsafe_ctx.deref_mut().bodies,
-                &mut unsafe_ctx.deref_mut().colliders,
-                &mut unsafe_ctx.deref_mut().impulse_joints,
-            )
+
+        // Use rapier data Index to make it easier to handle multibody and impulse joint handles together
+        // JointHandle is an option to account for multibody joint handles
+        // SAFETY: since the rapier context is accessed mutably, bevy restricts any other threads from
+        //         accessing the context, so this should be safe
+        let handles: UrdfRobotHandles<Option<Index>> = unsafe {
+            match robot.robot_joint_type {
+                RobotJointType::ImpulseJoints => {
+                    let handles = robot.rapier_urdf_robot
+                        .clone()
+                        .insert_using_impulse_joints(
+                            &mut unsafe_ctx.deref_mut().bodies,
+                            &mut unsafe_ctx.deref_mut().colliders,
+                            &mut unsafe_ctx.deref_mut().impulse_joints,
+                        );
+                    let joints: Vec<_> = handles.joints.iter()
+                        .map(|j| UrdfJointHandle {
+                            link1: j.link1,
+                            link2: j.link2,
+                            joint: Some(j.joint.0)
+                        })
+                        .collect();
+                    UrdfRobotHandles {
+                        links: handles.links,
+                        joints,
+                    }
+                },
+                RobotJointType::MultibodyJoints(options) => {
+                    let handles = robot.rapier_urdf_robot
+                        .clone()
+                        .insert_using_multibody_joints(
+                            &mut unsafe_ctx.deref_mut().bodies,
+                            &mut unsafe_ctx.deref_mut().colliders,
+                            &mut unsafe_ctx.deref_mut().multibody_joints,
+                            options
+                        );
+                    let joints: Vec<_> = handles.joints.iter()
+                        .map(|j| UrdfJointHandle {
+                            link1: j.link1,
+                            link2: j.link2,
+                            joint: j.joint.map(|j| j.0)
+                        })
+                        .collect();
+                    UrdfRobotHandles {
+                        links: handles.links,
+                        joints,
+                    }
+                },
+            }
         };
         let context = unsafe { unsafe_ctx.deref_mut() };
 
@@ -109,6 +156,14 @@ pub fn init_robots(
                 }
             }
             rb.user_data = rb_ent.id().to_bits() as u128;
+
+            // unsafe {
+            //     let unsafe_entity2body = UnsafeCell::new(
+            //         (context.entity2body() as *const HashMap<Entity, RigidBodyHandle>).read()
+            //     );
+            //     let ae = unsafe_entity2body.deref_mut();
+            //     ae.insert(rb_ent.id(), link.body);
+            // };
             let rb_ent = rb_ent.id();
 
             //spawning colliders
@@ -158,6 +213,14 @@ pub fn init_robots(
             }
         }
         commands.entity(entity).insert(RobotEntities);
-        //TODO: add joints
+
+        //TODO: Add MultibodyJoint components
+        // for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
+        //     if let RobotJointType::MultibodyJoints(..) =  robot.robot_joint_type {
+        //         if joint.is_none() { continue; }
+        //     }
+        //
+        //     // context.entity2body()
+        // }
     }
 }
