@@ -44,6 +44,12 @@ pub enum RobotJointType {
     MultibodyJoints(UrdfMultibodyOptions),
 }
 
+impl Default for RobotJointType {
+    fn default() -> Self {
+        Self::ImpulseJoints
+    }
+}
+
 //TODO: Add system that deals with this struct
 #[derive(Component)]
 pub struct RobotEntities;

@@ -9,13 +9,15 @@ use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cell::UnsafeCell;
 use bevy::ecs::system::lifetimeless::SCommands;
+use bevy::utils::default;
 use bevy_rapier3d::parry::math::{Isometry, Vector};
-use crate::urdf::UrdfRobot;
+use crate::urdf::{RobotJointType, UrdfRobot};
 
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,
     pub solvers: Vec<Box<dyn InverseKinematicsSolver<Real> + Send>>,
     pub solver_names: Vec<String>,
+    pub mb_loader_options: UrdfMultibodyOptions,
 }
 
 impl Default for IKSandboxUI {
@@ -30,13 +32,15 @@ impl Default for IKSandboxUI {
                 "Forward Ascent Cyclic".to_string(),
                 "Forward Descent Cyclic".to_string(),
             ],
+            mb_loader_options: UrdfMultibodyOptions::default(),
         }
     }
 }
 
 pub struct IKSandboxUIState {
     pub selected_solver_idx: usize,
-    pub urdf_loader_options: UrdfLoaderOptions
+    pub urdf_loader_options: UrdfLoaderOptions,
+    pub selected_joint_type: usize,
 }
 
 impl Default for IKSandboxUIState {
@@ -50,7 +54,8 @@ impl Default for IKSandboxUIState {
                 // Z-up to Y-up.
                 shift: Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2),
                 ..Default::default()
-            }
+            },
+            selected_joint_type: 0
         }
     }
 }
@@ -70,6 +75,14 @@ pub fn ik_sandbox_ui(
                     &mut ui_state.urdf_loader_options.make_roots_fixed,
                     "Make roots fixed"
                 );
+                ComboBox::from_label("Robot joint type")
+                    .selected_text(match ui_state.selected_joint_type {
+                        0 => "Impulse", 1 => "Multibody", _ => unreachable!()
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut ui_state.selected_joint_type, 0, "Impulse");
+                        ui.selectable_value(&mut ui_state.selected_joint_type, 1, "Multibody");
+                    });
                 let button = ui.button("Import URDF file");
                 if button.clicked() { //import urdf robot via file dialog
                     let dialog = rfd::FileDialog::new()
@@ -81,8 +94,13 @@ pub fn ik_sandbox_ui(
                             ui_state.urdf_loader_options.clone(),
                             None
                         ).unwrap();
-                        commands.spawn(UrdfRobot::from(robot)
-                            .with_multibody_joints(UrdfMultibodyOptions::default())
+                        let robot_cmp = UrdfRobot::from(robot);
+                        commands.spawn(
+                            match ui_state.selected_joint_type {
+                                0 => robot_cmp.with_impulse_joints(),
+                                1 => robot_cmp.with_multibody_joints(ui_data.mb_loader_options),
+                                _ => unreachable!()
+                            }
                         );
                     }
                 }
