@@ -32,7 +32,7 @@ impl Default for IKSandboxUI {
                 "Forward Ascent Cyclic".to_string(),
                 "Forward Descent Cyclic".to_string(),
             ],
-            mb_loader_options: UrdfMultibodyOptions::default(),
+            mb_loader_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
         }
     }
 }
@@ -64,7 +64,7 @@ pub fn ik_sandbox_ui(
     mut ctxs: EguiContexts,
     mut ui_data: Local<IKSandboxUI>,
     mut ui_state: Local<IKSandboxUIState>,
-    mut commands: Commands
+    mut commands: Commands,
 ) {
     egui::Window::new("Robot Sandbox").show(
         ctxs.ctx_mut(), |ui| {

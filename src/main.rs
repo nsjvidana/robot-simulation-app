@@ -8,7 +8,9 @@ use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
 use math::Real;
 use std::fs;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::plugin::PhysicsSet;
+use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
 use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, WriteDefaultRapierContext};
 
 mod kinematics;
@@ -24,7 +26,8 @@ fn main() {
         RapierPhysicsPlugin::<()>::default().in_fixed_schedule(),
         RapierDebugRenderPlugin::default(),
         SalvaPhysicsPlugin::new(),
-        EguiPlugin,
+        WorldInspectorPlugin::default(),
+        // EguiPlugin,
         NoCameraPlayerPlugin,
     ));
 
@@ -34,7 +37,12 @@ fn main() {
         // update
     ));
 
-    app.add_systems(FixedUpdate, urdf::init_robots.before(PhysicsSet::SyncBackend));
+    app.add_systems(FixedUpdate, urdf::init_robots
+        .in_set(PhysicsSet::SyncBackend)
+        .after(init_rigid_bodies)
+        .after(init_colliders)
+        .after(init_joints)
+    );
 
     app.run();
 }
@@ -49,12 +57,13 @@ pub fn update(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<bevy::prelude::Time>
 ) {
-    if keys.just_pressed(KeyCode::KeyP) {
-        rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = true;
-    }
-    else {
-        rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = false;
-    }
+    println!("FPS: {}", (1./time.delta_secs()) as u32);
+    // if keys.just_pressed(KeyCode::KeyP) {
+    //     rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = true;
+    // }
+    // else {
+    //     rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = false;
+    // }
 }
 
 pub fn startup(
