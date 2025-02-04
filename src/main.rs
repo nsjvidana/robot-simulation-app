@@ -1,17 +1,14 @@
-use std::path::Path;
-use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
-use bevy_egui::EguiPlugin;
+use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
+use bevy_rapier3d::plugin::PhysicsSet;
+use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
 use math::Real;
-use std::fs;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier3d::plugin::PhysicsSet;
-use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
-use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, WriteDefaultRapierContext};
 
 mod kinematics;
 mod math;
@@ -53,7 +50,7 @@ pub struct TestComponent {
 }
 
 pub fn update(
-    mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
+    // mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<bevy::prelude::Time>
 ) {

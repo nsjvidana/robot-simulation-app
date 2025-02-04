@@ -1,17 +1,12 @@
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
+use crate::urdf::UrdfRobot;
 use bevy::prelude::{Commands, Local};
-use bevy::ptr::UnsafeCellDeref;
 use bevy_egui::egui::ComboBox;
 use bevy_egui::{egui, EguiContexts};
-use bevy_rapier3d::prelude::WriteDefaultRapierContext;
+use bevy_rapier3d::parry::math::{Isometry, Vector};
 use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use std::cell::UnsafeCell;
-use bevy::ecs::system::lifetimeless::SCommands;
-use bevy::utils::default;
-use bevy_rapier3d::parry::math::{Isometry, Vector};
-use crate::urdf::{RobotJointType, UrdfRobot};
 
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,

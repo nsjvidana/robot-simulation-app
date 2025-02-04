@@ -1,4 +1,3 @@
-use bevy_salva3d::bevy_rapier;
 use k::nalgebra::{Quaternion, UnitVector3, Vector4};
 use k::{UnitQuaternion, Vector3};
 

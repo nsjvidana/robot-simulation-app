@@ -1,15 +1,12 @@
-use std::cell::UnsafeCell;
-use std::collections::HashMap;
 use crate::convert::IntoBevy;
-use bevy::{prelude::{Commands, Component, Entity, Parent, Query, Transform, With, Without}, hierarchy::BuildChildren};
-use bevy::prelude::EntityCommands;
 use bevy::ptr::UnsafeCellDeref;
+use bevy::{hierarchy::BuildChildren, prelude::{Commands, Component, Entity, Query, Transform, With, Without}};
 use bevy_rapier3d::geometry::SolverGroups;
-use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, Collider, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
+use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
 use bevy_rapier3d::rapier::data::Index;
-use bevy_rapier3d::rapier::dynamics::ImpulseJointHandle;
-use bevy_rapier3d::rapier::prelude::{ColliderHandle, RigidBodyAdditionalMassProps, RigidBodyHandle};
-use rapier3d_urdf::{UrdfJoint, UrdfJointHandle, UrdfLink, UrdfLinkHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobotHandles};
+use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
+use rapier3d_urdf::{UrdfJointHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobotHandles};
+use std::cell::UnsafeCell;
 
 #[derive(Component)]
 pub struct UrdfRobot {

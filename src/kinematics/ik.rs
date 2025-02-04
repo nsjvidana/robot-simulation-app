@@ -1,5 +1,5 @@
-use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JacobianIkSolver, JointType, SerialChain, Vector3};
 use crate::math::{angle_to, project_onto_plane, Real};
+use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JointType, SerialChain, Vector3};
 
 macro_rules! cyclic_impl {
     ($struct_name:ident) => {
