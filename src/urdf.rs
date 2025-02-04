@@ -12,7 +12,6 @@ use std::cell::UnsafeCell;
 pub struct UrdfRobot {
     pub rapier_urdf_robot: rapier3d_urdf::UrdfRobot,
     pub robot_joint_type: RobotJointType,
-    pub import_options: UrdfLoaderOptions
 }
 
 impl UrdfRobot {
@@ -32,7 +31,6 @@ impl From<rapier3d_urdf::UrdfRobot> for UrdfRobot {
         Self {
             rapier_urdf_robot: value,
             robot_joint_type: RobotJointType::ImpulseJoints,
-            import_options: UrdfLoaderOptions::default(),
         }
     }
 }
@@ -50,7 +48,22 @@ impl Default for RobotJointType {
 
 //TODO: Add system that deals with this struct
 #[derive(Component)]
-pub struct RobotEntities;
+pub struct RobotEntities {
+    link_entities: Vec<RobotLink>,
+}
+
+#[derive(Component)]
+pub struct LinkEntity {
+    pub colliders: Vec<Entity>,
+}
+
+#[derive(Component)]
+pub struct RobotPart(pub Entity);
+
+pub struct RobotLink {
+    rigid_body: Entity,
+    colliders: Vec<Entity>,
+}
 
 macro_rules! rapier_collider_to_components {
     ($coll:expr, $coll_handle:expr, $context_link:expr) => {
@@ -125,7 +138,7 @@ pub fn init_robots(
     mut context_q: Query<&mut RapierContext>,
 ) {
     //TODO: parallelize this?
-    for (entity, robot, ctx_link) in robot_q.iter() {
+    for (robot_entity, robot, ctx_link) in robot_q.iter() {
         let context_link = RapierContextEntityLink(
             ctx_link.map_or_else(
                 || default_context_q.single(),
@@ -186,11 +199,13 @@ pub fn init_robots(
         let context = unsafe { unsafe_ctx.deref_mut() };
 
         //Spawning link & collider entities
+        let mut robot_links = Vec::with_capacity(handles.links.len());
         for link in handles.links.iter() {
             let rb = context.bodies.get_mut(link.body).unwrap();
             let mut rb_ent = commands.spawn(
                 rapier_rb_to_components!(rb, link.body, context_link)
             );
+            rb_ent.insert(RobotPart(robot_entity));
             if !rb.is_enabled() { rb_ent.insert(RigidBodyDisabled); }
             if let Some(additional_mprops) = &rb.mass_properties().additional_local_mprops {
                 match *(*additional_mprops) {
@@ -208,6 +223,7 @@ pub fn init_robots(
             let rb_ent = rb_ent.id();
 
             //spawning colliders
+            let mut collider_entities = Vec::with_capacity(link.colliders.len());
             for coll_handle in link.colliders.iter() {
                 let coll = context.colliders.get_mut(*coll_handle).unwrap();
                 let mut coll_ent = commands.spawn(
@@ -219,17 +235,29 @@ pub fn init_robots(
                 if !coll.is_enabled() { coll_ent.insert(ColliderDisabled); }
                 coll_ent.set_parent(rb_ent);
                 coll.user_data = coll_ent.id().to_bits() as u128;
+                collider_entities.push(coll_ent.id());
             }
+
+            commands.entity(rb_ent)
+                .insert(LinkEntity { colliders: collider_entities.clone() })
+                .insert(RobotPart(robot_entity));
+
+            robot_links.push(RobotLink {
+                rigid_body: rb_ent,
+                colliders: collider_entities
+            });
         }
-        commands.entity(entity).insert(RobotEntities);
+        commands.entity(robot_entity).insert(RobotEntities {
+            link_entities: robot_links,
+        });
 
         //TODO: Add MultibodyJoint components
-        // for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
-        //     if let RobotJointType::MultibodyJoints(..) =  robot.robot_joint_type {
-        //         if joint.is_none() { continue; }
-        //     }
-        //
-        //     // context.entity2body()
-        // }
+        for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
+            if let RobotJointType::MultibodyJoints(..) =  robot.robot_joint_type {
+                if joint.is_none() { continue; }
+            }
+
+            // context.entity2body()
+        }
     }
 }

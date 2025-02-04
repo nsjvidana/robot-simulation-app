@@ -1,10 +1,10 @@
-use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
+use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Res, Startup, Update};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
 use bevy_rapier3d::plugin::PhysicsSet;
-use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin};
+use bevy_rapier3d::prelude::RapierDebugRenderPlugin;
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
