@@ -1,6 +1,6 @@
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
-use crate::urdf::UrdfRobot;
+use crate::urdf::Robot;
 use bevy::prelude::{Commands, Local};
 use bevy_egui::egui::ComboBox;
 use bevy_egui::{egui, EguiContexts};
@@ -89,7 +89,7 @@ pub fn ik_sandbox_ui(
                             ui_state.urdf_loader_options.clone(),
                             None
                         ).unwrap();
-                        let robot_cmp = UrdfRobot::from(robot);
+                        let robot_cmp = Robot::new(robot);
                         commands.spawn(
                             match ui_state.selected_joint_type {
                                 0 => robot_cmp.with_impulse_joints(),

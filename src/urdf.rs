@@ -5,16 +5,23 @@ use bevy_rapier3d::geometry::SolverGroups;
 use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
 use bevy_rapier3d::rapier::data::Index;
 use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
-use rapier3d_urdf::{UrdfJointHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobotHandles};
+use rapier3d_urdf::{UrdfJointHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
 
 #[derive(Component)]
-pub struct UrdfRobot {
-    pub rapier_urdf_robot: rapier3d_urdf::UrdfRobot,
+pub struct Robot {
+    rapier_urdf_robot: Option<UrdfRobot>,
     pub robot_joint_type: RobotJointType,
 }
 
-impl UrdfRobot {
+impl Robot {
+    pub fn new(robot: UrdfRobot) -> Self {
+        Self {
+            rapier_urdf_robot: Some(robot),
+            robot_joint_type: RobotJointType::ImpulseJoints,
+        }
+    }
+
     pub fn with_impulse_joints(mut self) -> Self {
         self.robot_joint_type = RobotJointType::ImpulseJoints;
         self
@@ -23,15 +30,6 @@ impl UrdfRobot {
     pub fn with_multibody_joints(mut self, joint_options: UrdfMultibodyOptions) -> Self {
         self.robot_joint_type = RobotJointType::MultibodyJoints(joint_options);
         self
-    }
-}
-
-impl From<rapier3d_urdf::UrdfRobot> for UrdfRobot {
-    fn from(value: rapier3d_urdf::UrdfRobot) -> Self {
-        Self {
-            rapier_urdf_robot: value,
-            robot_joint_type: RobotJointType::ImpulseJoints,
-        }
     }
 }
 
@@ -46,7 +44,6 @@ impl Default for RobotJointType {
     }
 }
 
-//TODO: Add system that deals with this struct
 #[derive(Component)]
 pub struct RobotEntities {
     link_entities: Vec<RobotLink>,
@@ -133,12 +130,12 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
-    robot_q: Query<(Entity, &UrdfRobot, Option<&RapierContextEntityLink>), Without<RobotEntities>>,
+    mut robot_q: Query<(Entity, &mut Robot, Option<&RapierContextEntityLink>), Without<RobotEntities>>,
     default_context_q: Query<Entity, With<DefaultRapierContext>>,
     mut context_q: Query<&mut RapierContext>,
 ) {
     //TODO: parallelize this?
-    for (robot_entity, robot, ctx_link) in robot_q.iter() {
+    for (robot_entity, mut robot, ctx_link) in robot_q.iter_mut() {
         let context_link = RapierContextEntityLink(
             ctx_link.map_or_else(
                 || default_context_q.single(),
@@ -154,8 +151,7 @@ pub fn init_robots(
         let handles: UrdfRobotHandles<Option<Index>> = unsafe {
             match robot.robot_joint_type {
                 RobotJointType::ImpulseJoints => {
-                    let handles = robot.rapier_urdf_robot
-                        .clone()
+                    let handles = robot.rapier_urdf_robot.take().unwrap()
                         .insert_using_impulse_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,
@@ -174,8 +170,7 @@ pub fn init_robots(
                     }
                 },
                 RobotJointType::MultibodyJoints(options) => {
-                    let handles = robot.rapier_urdf_robot
-                        .clone()
+                    let handles = robot.rapier_urdf_robot.take().unwrap()
                         .insert_using_multibody_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,
