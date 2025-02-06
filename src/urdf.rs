@@ -2,9 +2,9 @@ use crate::convert::IntoBevy;
 use bevy::ptr::UnsafeCellDeref;
 use bevy::{hierarchy::BuildChildren, prelude::{Commands, Component, Entity, Query, Transform, With, Without}};
 use bevy_rapier3d::geometry::SolverGroups;
-use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GravityScale, MassProperties, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping};
+use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GenericJoint, GravityScale, ImpulseJoint, MassProperties, MultibodyJoint, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierImpulseJointHandle, RapierMultibodyJointHandle, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping, TypedJoint};
 use bevy_rapier3d::rapier::data::Index;
-use bevy_rapier3d::rapier::prelude::RigidBodyAdditionalMassProps;
+use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, RigidBodyAdditionalMassProps};
 use rapier3d_urdf::{UrdfJointHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
 
@@ -242,9 +242,6 @@ pub fn init_robots(
                 colliders: collider_entities
             });
         }
-        commands.entity(robot_entity).insert(RobotEntities {
-            link_entities: robot_links,
-        });
 
         //TODO: Add MultibodyJoint components
         for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
@@ -252,7 +249,49 @@ pub fn init_robots(
                 if joint.is_none() { continue; }
             }
 
-            // context.entity2body()
+            let par_idx = handles
+                .links
+                .iter()
+                .enumerate()
+                .find(|(_, link)| link.body == *link1)
+                .unwrap()
+                .0;
+            let child_idx = handles
+                .links
+                .iter()
+                .enumerate()
+                .find(|(_, link)| link.body == *link2)
+                .unwrap()
+                .0;
+            let par_ent = robot_links[par_idx].rigid_body;
+            let mut child_ent_cmd = commands.entity(robot_links[child_idx].rigid_body);
+            match robot.robot_joint_type {
+                RobotJointType::ImpulseJoints => {
+                    let handle = ImpulseJointHandle(joint.unwrap());
+                    let imp_j = context.impulse_joints.get(handle).unwrap();
+                    child_ent_cmd.insert((
+                        RapierImpulseJointHandle(handle),
+                        ImpulseJoint::new(par_ent, TypedJoint::GenericJoint(GenericJoint {
+                            raw: imp_j.data
+                        }))
+                    ));
+                },
+                RobotJointType::MultibodyJoints(..) => {
+                    let handle = MultibodyJointHandle(joint.unwrap());
+                    let (mb, link_id) = context.multibody_joints.get(handle).unwrap();
+                    child_ent_cmd.insert((
+                        RapierMultibodyJointHandle(handle),
+                        MultibodyJoint::new(par_ent, TypedJoint::GenericJoint(GenericJoint {
+                            raw: mb.link(link_id).unwrap().joint.data
+                        })),
+                    ));
+                },
+            }
         }
+
+
+        commands.entity(robot_entity).insert(RobotEntities {
+            link_entities: robot_links,
+        });
     }
 }
