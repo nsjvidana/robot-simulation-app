@@ -227,16 +227,17 @@ pub fn init_robots(
             let mut collider_entities = Vec::with_capacity(link.colliders.len());
             for coll_handle in link.colliders.iter().copied() {
                 let coll = context.colliders.get_mut(coll_handle).unwrap();
-                let mut coll_ent = commands.spawn(
-                    rapier_collider_to_components!(coll, coll_handle, context_link)
-                );
+                let mut coll_ent = commands.spawn((
+                    rapier_collider_to_components!(coll, coll_handle, context_link),
+                    RobotPart(robot_entity),
+                ));
                 coll_ent
                     .insert_if(Sensor, || coll.is_sensor())//ColliderType
                     .insert_if(ColliderDisabled, || !coll.is_enabled())//ColliderFlags::enabled
                     .set_parent(rb_ent);
                 coll.user_data = coll_ent.id().to_bits() as u128;
                 collider_entities.push(coll_ent.id());
-                // context.entity2collider.insert(coll_ent.id(), coll_handle);
+                context.entity2collider.insert(coll_ent.id(), coll_handle);
             }
 
             commands.entity(rb_ent)

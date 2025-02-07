@@ -1,10 +1,11 @@
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
-use crate::urdf::Robot;
-use bevy::prelude::{Commands, Local};
+use crate::urdf::{Robot, RobotPart};
+use bevy::prelude::{ButtonInput, Camera, Camera3d, Commands, Entity, GlobalTransform, Local, MouseButton, Name, Query, Res, Single, Window};
 use bevy_egui::egui::ComboBox;
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
+use bevy_rapier3d::prelude::{QueryFilter, ReadDefaultRapierContext};
 use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 
@@ -13,6 +14,7 @@ pub struct IKSandboxUI {
     pub solvers: Vec<Box<dyn InverseKinematicsSolver<Real> + Send>>,
     pub solver_names: Vec<String>,
     pub mb_loader_options: UrdfMultibodyOptions,
+    pub selected_robot: Option<Entity>
 }
 
 impl Default for IKSandboxUI {
@@ -28,6 +30,7 @@ impl Default for IKSandboxUI {
                 "Forward Descent Cyclic".to_string(),
             ],
             mb_loader_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
+            selected_robot: None
         }
     }
 }
@@ -60,7 +63,43 @@ pub fn ik_sandbox_ui(
     mut ui_data: Local<IKSandboxUI>,
     mut ui_state: Local<IKSandboxUIState>,
     mut commands: Commands,
+    robot_part_q: Query<&RobotPart>,
+    name_q: Query<&Name>,
+    camera: Single<(&Camera, &GlobalTransform)>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window>,
+    rapier_context: ReadDefaultRapierContext
 ) {
+    let mut clicked_entity = None;
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let (camera, camera_transform) = *camera;
+        if let Some(pos) = window
+            .cursor_position()
+            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
+        {
+            if let Some((rb_ent, _)) = rapier_context.cast_ray(
+                pos.origin,
+                pos.direction.as_vec3(),
+                1000.0,
+                true,
+                QueryFilter::default()
+            ) {
+                clicked_entity = Some(rb_ent);
+                if let Ok(robot_entity) = robot_part_q.get(rb_ent).map(|v| v.0) {
+                    ui_data.selected_robot = Some(robot_entity);
+                    if let Ok(robot_name) = name_q.get(robot_entity) {
+                        println!("Selected robot {:?}", robot_name);
+                    }
+                }
+                else { ui_data.selected_robot = None; }
+            }
+            else {
+                clicked_entity = None;
+                ui_data.selected_robot = None;
+            }
+        }
+    }
+
     egui::Window::new("Robot Sandbox").show(
         ctxs.ctx_mut(), |ui| {
 
@@ -84,19 +123,22 @@ pub fn ik_sandbox_ui(
                         .add_filter("Robot Description", &["urdf", "URDF"])
                         .pick_file();
                     if let Some(path) = dialog {
+                        let robot_name = path.file_stem().unwrap()
+                            .to_str().unwrap().to_string();
                         let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
                             path,
                             ui_state.urdf_loader_options.clone(),
                             None
                         ).unwrap();
                         let robot_cmp = Robot::new(robot);
-                        commands.spawn(
+                        commands.spawn((
                             match ui_state.selected_joint_type {
                                 0 => robot_cmp.with_impulse_joints(),
                                 1 => robot_cmp.with_multibody_joints(ui_data.mb_loader_options),
                                 _ => unreachable!()
-                            }
-                        );
+                            },
+                            Name::new(robot_name)
+                        ));
                     }
                 }
             });
@@ -118,11 +160,13 @@ pub fn ik_sandbox_ui(
                     });
 
                 ui.horizontal(|ui| {
+
                     ui.label("Chain:");
                     let _ = ui.button(
                         if ui_data.kinematic_chain.is_some() {"Chain" }
                         else { "N/A" }
                     );
+
                 });
             });
         }
