@@ -50,7 +50,7 @@ pub struct TestComponent {
 
 pub fn update(
     // mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
-    keys: Res<ButtonInput<KeyCode>>,
+    // keys: Res<ButtonInput<KeyCode>>,
     time: Res<bevy::prelude::Time>
 ) {
     println!("FPS: {}", (1./time.delta_secs()) as u32);

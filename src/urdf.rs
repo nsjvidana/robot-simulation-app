@@ -225,7 +225,7 @@ pub fn init_robots(
 
             //spawning colliders
             let mut collider_entities = Vec::with_capacity(link.colliders.len());
-            for coll_handle in link.colliders.iter().map(|v| *v) {
+            for coll_handle in link.colliders.iter().copied() {
                 let coll = context.colliders.get_mut(coll_handle).unwrap();
                 let mut coll_ent = commands.spawn(
                     rapier_collider_to_components!(coll, coll_handle, context_link)

@@ -105,7 +105,7 @@ pub fn ik_sandbox_ui(
             ui.collapsing("Inverse Kinematics", |ui| {
                 let solver_idx = ui_state.selected_solver_idx;
                 let selected_solver_name =
-                    if let Some(solver) = ui_data.solvers.get(solver_idx) {
+                    if ui_data.solvers.get(solver_idx).is_some() {
                         ui_data.solver_names.get(solver_idx).unwrap()
                     }
                     else { &"-".to_string() };

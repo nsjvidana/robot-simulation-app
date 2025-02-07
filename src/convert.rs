@@ -77,35 +77,24 @@ pub struct RapierContext {
     /// The solver, which handles Continuous Collision Detection (CCD).
     pub ccd_solver: CCDSolver,
     /// The physics pipeline, which advance the simulation step by step.
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub pipeline: PhysicsPipeline,
     /// The query pipeline, which performs scene queries (ray-casting, point projection, etc.)
     pub query_pipeline: QueryPipeline,
     /// The integration parameters, controlling various low-level coefficient of the simulation.
     pub integration_parameters: IntegrationParameters,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) event_handler: Option<Box<dyn EventHandler>>,
     // For transform change detection.
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) last_body_transform_set: HashMap<RigidBodyHandle, GlobalTransform>,
     // NOTE: these maps are needed to handle despawning.
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) entity2body: HashMap<Entity, RigidBodyHandle>,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) entity2collider: HashMap<Entity, ColliderHandle>,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) entity2impulse_joint: HashMap<Entity, ImpulseJointHandle>,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) entity2multibody_joint: HashMap<Entity, MultibodyJointHandle>,
     // This maps the handles of colliders that have been deleted since the last
     // physics update, to the entity they was attached to.
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) deleted_colliders: HashMap<ColliderHandle, Entity>,
 
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) collision_events_to_send: Vec<CollisionEvent>,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) contact_force_events_to_send: Vec<ContactForceEvent>,
-    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) character_collisions_collector: Vec<rapier::control::CharacterCollision>,
 }
