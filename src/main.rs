@@ -6,7 +6,6 @@ use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bod
 use bevy_rapier3d::plugin::PhysicsSet;
 use bevy_rapier3d::prelude::RapierDebugRenderPlugin;
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
-use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use k::SerialChain;
 use math::Real;
 
@@ -22,7 +21,7 @@ fn main() {
         DefaultPlugins,
         RapierPhysicsPlugin::<()>::default().in_fixed_schedule(),
         RapierDebugRenderPlugin::default(),
-        SalvaPhysicsPlugin::new(),
+        // SalvaPhysicsPlugin::new(),
         WorldInspectorPlugin::default(),
         // EguiPlugin,
         NoCameraPlayerPlugin,

@@ -1,11 +1,12 @@
 use crate::convert::IntoBevy;
+use bevy::prelude::Mut;
 use bevy::ptr::UnsafeCellDeref;
 use bevy::{hierarchy::BuildChildren, prelude::{Commands, Component, Entity, Query, Transform, With, Without}};
 use bevy_rapier3d::geometry::SolverGroups;
 use bevy_rapier3d::prelude::{AdditionalMassProperties, AdditionalSolverIterations, Ccd, ColliderDisabled, ColliderMassProperties, CollisionGroups, Damping, DefaultRapierContext, Dominance, Friction, GenericJoint, GravityScale, ImpulseJoint, MassProperties, MultibodyJoint, RapierColliderHandle, RapierContext, RapierContextEntityLink, RapierImpulseJointHandle, RapierMultibodyJointHandle, RapierRigidBodyHandle, Restitution, RigidBody, RigidBodyDisabled, Sensor, Sleeping, TypedJoint};
 use bevy_rapier3d::rapier::data::Index;
 use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, RigidBodyAdditionalMassProps};
-use rapier3d_urdf::{UrdfJointHandle, UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
+use rapier3d_urdf::{UrdfJointHandle, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
 
 #[derive(Component)]
@@ -96,7 +97,7 @@ macro_rules! rapier_collider_to_components {
             $coll.active_hooks().into_bevy(),
             $coll.active_events().into_bevy(),
 
-            RapierColliderHandle(*$coll_handle),
+            RapierColliderHandle($coll_handle),
             $context_link,
         )
     };
@@ -191,17 +192,21 @@ pub fn init_robots(
                 },
             }
         };
-        let context = unsafe { unsafe_ctx.deref_mut() };
+        // SAFETY: This is ok since crate::convert::RapierContext is implemented exactly the same as
+        //         the bevy_rapier RapierContext
+        let mut context: Mut<crate::convert::RapierContext> = unsafe {
+            std::mem::transmute(unsafe_ctx.into_inner())
+        };
 
         //Spawning link & collider entities
         let mut robot_links = Vec::with_capacity(handles.links.len());
         for link in handles.links.iter() {
             let rb = context.bodies.get_mut(link.body).unwrap();
-            let mut rb_ent = commands.spawn(
-                rapier_rb_to_components!(rb, link.body, context_link)
-            );
-            rb_ent.insert(RobotPart(robot_entity));
-            if !rb.is_enabled() { rb_ent.insert(RigidBodyDisabled); }
+            let mut rb_ent = commands.spawn((
+                rapier_rb_to_components!(rb, link.body, context_link),
+                RobotPart(robot_entity)
+            ));
+            rb_ent.insert_if(RigidBodyDisabled, || !rb.is_enabled());
             if let Some(additional_mprops) = &rb.mass_properties().additional_local_mprops {
                 match *(*additional_mprops) {
                     RigidBodyAdditionalMassProps::MassProps(mprops) => {
@@ -214,28 +219,31 @@ pub fn init_robots(
                     },
                 }
             }
-            rb.user_data = rb_ent.id().to_bits() as u128;
             let rb_ent = rb_ent.id();
+            rb.user_data = rb_ent.to_bits() as u128;
+            context.entity2body.insert(rb_ent, link.body);
 
             //spawning colliders
             let mut collider_entities = Vec::with_capacity(link.colliders.len());
-            for coll_handle in link.colliders.iter() {
-                let coll = context.colliders.get_mut(*coll_handle).unwrap();
+            for coll_handle in link.colliders.iter().map(|v| *v) {
+                let coll = context.colliders.get_mut(coll_handle).unwrap();
                 let mut coll_ent = commands.spawn(
                     rapier_collider_to_components!(coll, coll_handle, context_link)
                 );
-                //ColliderType
-                if coll.is_sensor() { coll_ent.insert(Sensor); }
-                //ColliderFlags::enabled
-                if !coll.is_enabled() { coll_ent.insert(ColliderDisabled); }
-                coll_ent.set_parent(rb_ent);
+                coll_ent
+                    .insert_if(Sensor, || coll.is_sensor())//ColliderType
+                    .insert_if(ColliderDisabled, || !coll.is_enabled())//ColliderFlags::enabled
+                    .set_parent(rb_ent);
                 coll.user_data = coll_ent.id().to_bits() as u128;
                 collider_entities.push(coll_ent.id());
+                // context.entity2collider.insert(coll_ent.id(), coll_handle);
             }
 
             commands.entity(rb_ent)
-                .insert(LinkEntity { colliders: collider_entities.clone() })
-                .insert(RobotPart(robot_entity));
+                .insert((
+                    LinkEntity { colliders: collider_entities.clone() },
+                    RobotPart(robot_entity)
+                ));
 
             robot_links.push(RobotLink {
                 rigid_body: rb_ent,
@@ -245,9 +253,7 @@ pub fn init_robots(
 
         //TODO: Add MultibodyJoint components
         for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
-            if let RobotJointType::MultibodyJoints(..) =  robot.robot_joint_type {
-                if joint.is_none() { continue; }
-            }
+            if joint.is_none() { continue; }
 
             let par_idx = handles
                 .links
@@ -275,6 +281,8 @@ pub fn init_robots(
                             raw: imp_j.data
                         }))
                     ));
+
+                    context.entity2impulse_joint.insert(child_ent_cmd.id(), handle);
                 },
                 RobotJointType::MultibodyJoints(..) => {
                     let handle = MultibodyJointHandle(joint.unwrap());
@@ -285,10 +293,11 @@ pub fn init_robots(
                             raw: mb.link(link_id).unwrap().joint.data
                         })),
                     ));
+
+                    context.entity2multibody_joint.insert(child_ent_cmd.id(), handle);
                 },
             }
         }
-
 
         commands.entity(robot_entity).insert(RobotEntities {
             link_entities: robot_links,
