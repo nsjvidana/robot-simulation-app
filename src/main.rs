@@ -21,12 +21,13 @@ fn main() {
     let mut app = App::new();
     app.add_plugins((
         DefaultPlugins,
-        RapierPhysicsPlugin::<()>::default().in_fixed_schedule(),
+        RapierPhysicsPlugin::<()>::default()
+            .in_schedule(FixedUpdate),
         RapierDebugRenderPlugin::default(),
         // SalvaPhysicsPlugin::new(),
         WorldInspectorPlugin::default(),
         // EguiPlugin,
-        RobotLabUiPlugin::new(Update),
+        RobotLabUiPlugin::new(Update, FixedUpdate),
         NoCameraPlayerPlugin,
     ));
 

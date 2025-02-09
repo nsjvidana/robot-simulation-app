@@ -4,7 +4,7 @@ use bevy::ecs::schedule::ScheduleLabel;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
 use crate::robot::{Robot, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, Without};
+use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, With, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -15,12 +15,14 @@ use crate::ui;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
+    physics_schedule: Interned<dyn ScheduleLabel>
 }
 
 impl RobotLabUiPlugin {
-    pub fn new(schedule: impl ScheduleLabel) -> Self {
+    pub fn new(schedule: impl ScheduleLabel, physics_schedule: impl ScheduleLabel) -> Self {
         Self {
-            schedule: schedule.intern()
+            schedule: schedule.intern(),
+            physics_schedule: physics_schedule.intern()
         }
     }
 }
@@ -29,10 +31,8 @@ impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PhysicsSimUi>();
 
-        app.add_systems(self.schedule, (
-            ik_sandbox_ui.before(PhysicsSet::SyncBackend),
-            // update
-        ));
+        app.add_systems(self.schedule, ik_sandbox_ui.before(PhysicsSet::SyncBackend))
+            .add_systems(self.physics_schedule, control_physics_sim.before(PhysicsSet::SyncBackend));
     }
 }
 
@@ -88,12 +88,14 @@ impl Default for IKSandboxUIState {
 #[derive(Resource)]
 pub struct PhysicsSimUi {
     pub physics_enabled: bool,
+    pub sim_step_pressed: bool
 }
 
 impl Default for PhysicsSimUi {
     fn default() -> Self {
         Self {
             physics_enabled: false,
+            sim_step_pressed: false
         }
     }
 }
@@ -146,8 +148,6 @@ pub fn ik_sandbox_ui(
 
             physics_sim_ui(
                 ui,
-                &mut ui_data,
-                &mut ui_state,
                 &mut physics_sim_ui_data
             );
         }
@@ -261,8 +261,6 @@ fn robot_ik_ui(
 
 fn physics_sim_ui(
     ui: &mut Ui,
-    ui_data: &mut IKSandboxUI,
-    ui_state: &mut IKSandboxUIState,
     physics_sim_ui_data: &mut PhysicsSimUi,
 ) {
     ui.collapsing("Physics", |ui| {
@@ -275,5 +273,26 @@ fn physics_sim_ui(
         if pause_toggle.clicked() {
             physics_sim_ui_data.physics_enabled = !physics_sim_ui_data.physics_enabled;
         }
+        physics_sim_ui_data.sim_step_pressed = step.clicked();
     });
+}
+
+fn control_physics_sim(
+    mut rapier_config_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
+    mut physics_sim_ui: ResMut<PhysicsSimUi>
+) {
+    let mut config = rapier_config_q.single_mut();
+    if physics_sim_ui.physics_enabled {
+        //pause sim if step btn was pressed while sim was enabled
+        if physics_sim_ui.sim_step_pressed {
+            physics_sim_ui.physics_enabled = false;
+            config.physics_pipeline_active = false;
+        }
+        else { config.physics_pipeline_active = true; } //if step not pressed, continue sim as usual.
+    }
+    else {
+        //run sim for this frame only if the step btn was pressed while sim was disabled
+        if physics_sim_ui.sim_step_pressed { config.physics_pipeline_active = true; }
+        else { config.physics_pipeline_active = false; } //stop sim if step wasn't pressed.
+    }
 }
