@@ -70,32 +70,17 @@ pub fn ik_sandbox_ui(
     window: Single<&Window>,
     rapier_context: ReadDefaultRapierContext
 ) {
-    let mut clicked_entity = None;
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let (camera, camera_transform) = *camera;
-        if let Some(pos) = window
-            .cursor_position()
-            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
-        {
-            if let Some((rb_ent, _)) = rapier_context.cast_ray(
-                pos.origin,
-                pos.direction.as_vec3(),
-                1000.0,
-                true,
-                QueryFilter::default()
-            ) {
-                clicked_entity = Some(rb_ent);
-                if let Ok(robot_entity) = robot_part_q.get(rb_ent).map(|v| v.0) {
-                    ui_data.selected_robot = Some(robot_entity);
-                    if let Ok(robot_name) = name_q.get(robot_entity) {
-                        println!("Selected robot {:?}", robot_name);
-                    }
-                }
-                else { ui_data.selected_robot = None; }
-            }
-            else {
-                clicked_entity = None;
-                ui_data.selected_robot = None;
+    let clicked_entity = get_clicked_entity(
+        camera,
+        mouse_button_input,
+        window,
+        rapier_context,
+    );
+
+    if let Some(entity) = clicked_entity {
+        if let Ok(robot_entity) = robot_part_q.get(entity).map(|v| v.0) {
+            if let Ok(name) = name_q.get(robot_entity) {
+                println!("{}", name);
             }
         }
     }
@@ -171,4 +156,31 @@ pub fn ik_sandbox_ui(
             });
         }
     );
+}
+
+// Gets the entity clicked in the current frame. Returns None if no entity was clicked.
+fn get_clicked_entity(
+    camera: Single<(&Camera, &GlobalTransform)>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window>,
+    rapier_context: ReadDefaultRapierContext
+) -> Option<Entity> {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let (camera, camera_transform) = *camera;
+        if let Some(pos) = window
+            .cursor_position()
+            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
+        {
+            if let Some((rb_ent, _)) = rapier_context.cast_ray(
+                pos.origin,
+                pos.direction.as_vec3(),
+                1000.0,
+                true,
+                QueryFilter::default()
+            ) {
+                return Some(rb_ent);
+            }
+        }
+    }
+    None
 }
