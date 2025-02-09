@@ -11,6 +11,7 @@ use math::Real;
 
 mod kinematics;
 mod math;
+#[allow(clippy::too_many_arguments)]
 mod ui;
 mod convert;
 mod robot;

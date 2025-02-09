@@ -2,7 +2,7 @@ use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
 use crate::robot::{Robot, RobotPart};
 use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, Local, MouseButton, Name, Query, Res, Single, Window};
-use bevy_egui::egui::ComboBox;
+use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use bevy_rapier3d::prelude::{QueryFilter, ReadDefaultRapierContext};
@@ -89,71 +89,19 @@ pub fn ik_sandbox_ui(
         ctxs.ctx_mut(), |ui| {
 
             //Robot importing
-            ui.collapsing("Import Robot", |ui| {
-                let _checkbox = ui.checkbox(
-                    &mut ui_state.urdf_loader_options.make_roots_fixed,
-                    "Make roots fixed"
-                );
-                ComboBox::from_label("Robot joint type")
-                    .selected_text(match ui_state.selected_joint_type {
-                        0 => "Impulse", 1 => "Multibody", _ => unreachable!()
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut ui_state.selected_joint_type, 0, "Impulse");
-                        ui.selectable_value(&mut ui_state.selected_joint_type, 1, "Multibody");
-                    });
-                let button = ui.button("Import URDF file");
-                if button.clicked() { //import urdf robot via file dialog
-                    let dialog = rfd::FileDialog::new()
-                        .add_filter("Robot Description", &["urdf", "URDF"])
-                        .pick_file();
-                    if let Some(path) = dialog {
-                        let robot_name = path.file_stem().unwrap()
-                            .to_str().unwrap().to_string();
-                        let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
-                            path,
-                            ui_state.urdf_loader_options.clone(),
-                            None
-                        ).unwrap();
-                        let robot_cmp = Robot::new(robot);
-                        commands.spawn((
-                            match ui_state.selected_joint_type {
-                                0 => robot_cmp.with_impulse_joints(),
-                                1 => robot_cmp.with_multibody_joints(ui_data.mb_loader_options),
-                                _ => unreachable!()
-                            },
-                            Name::new(robot_name)
-                        ));
-                    }
-                }
-            });
+            robot_import_ui(
+                &mut commands,
+                ui,
+                &mut ui_data,
+                &mut ui_state,
+            );
 
             //Inverse Kinematics
-            ui.collapsing("Inverse Kinematics", |ui| {
-                let solver_idx = ui_state.selected_solver_idx;
-                let selected_solver_name =
-                    if ui_data.solvers.get(solver_idx).is_some() {
-                        ui_data.solver_names.get(solver_idx).unwrap()
-                    }
-                    else { &"-".to_string() };
-                ComboBox::from_label("Solver type")
-                    .selected_text(selected_solver_name)
-                    .show_ui(ui, |ui| {
-                        for (i, solver_name) in ui_data.solver_names.iter().enumerate() {
-                            ui.selectable_value(&mut ui_state.selected_solver_idx, i, solver_name);
-                        }
-                    });
-
-                ui.horizontal(|ui| {
-
-                    ui.label("Chain:");
-                    let _ = ui.button(
-                        if ui_data.kinematic_chain.is_some() {"Chain" }
-                        else { "N/A" }
-                    );
-
-                });
-            });
+            robot_ik_ui(
+                ui,
+                &mut ui_data,
+                &mut ui_state,
+            );
         }
     );
 }
@@ -183,4 +131,82 @@ fn get_clicked_entity(
         }
     }
     None
+}
+
+fn robot_import_ui(
+    commands: &mut Commands,
+    ui: &mut Ui,
+    ui_data: &mut IKSandboxUI,
+    ui_state: &mut IKSandboxUIState,
+) {
+    ui.collapsing("Import Robot", |ui| {
+        let _checkbox = ui.checkbox(
+            &mut ui_state.urdf_loader_options.make_roots_fixed,
+            "Make roots fixed"
+        );
+        ComboBox::from_label("Robot joint type")
+            .selected_text(match ui_state.selected_joint_type {
+                0 => "Impulse", 1 => "Multibody", _ => unreachable!()
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut ui_state.selected_joint_type, 0, "Impulse");
+                ui.selectable_value(&mut ui_state.selected_joint_type, 1, "Multibody");
+            });
+        let button = ui.button("Import URDF file");
+        if button.clicked() { //import urdf robot via file dialog
+            let dialog = rfd::FileDialog::new()
+                .add_filter("Robot Description", &["urdf", "URDF"])
+                .pick_file();
+            if let Some(path) = dialog {
+                let robot_name = path.file_stem().unwrap()
+                    .to_str().unwrap().to_string();
+                let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
+                    path,
+                    ui_state.urdf_loader_options.clone(),
+                    None
+                ).unwrap();
+                let robot_cmp = Robot::new(robot);
+                commands.spawn((
+                    match ui_state.selected_joint_type {
+                        0 => robot_cmp.with_impulse_joints(),
+                        1 => robot_cmp.with_multibody_joints(ui_data.mb_loader_options),
+                        _ => unreachable!()
+                    },
+                    Name::new(robot_name)
+                ));
+            }
+        }
+    });
+}
+
+fn robot_ik_ui(
+    ui: &mut Ui,
+    ui_data: &mut IKSandboxUI,
+    ui_state: &mut IKSandboxUIState,
+) {
+    ui.collapsing("Inverse Kinematics", |ui| {
+        let solver_idx = ui_state.selected_solver_idx;
+        let selected_solver_name =
+            if ui_data.solvers.get(solver_idx).is_some() {
+                ui_data.solver_names.get(solver_idx).unwrap()
+            }
+            else { &"-".to_string() };
+        ComboBox::from_label("Solver type")
+            .selected_text(selected_solver_name)
+            .show_ui(ui, |ui| {
+                for (i, solver_name) in ui_data.solver_names.iter().enumerate() {
+                    ui.selectable_value(&mut ui_state.selected_solver_idx, i, solver_name);
+                }
+            });
+
+        ui.horizontal(|ui| {
+
+            ui.label("Chain:");
+            let _ = ui.button(
+                if ui_data.kinematic_chain.is_some() {"Chain" }
+                else { "N/A" }
+            );
+
+        });
+    });
 }
