@@ -12,8 +12,8 @@ use math::Real;
 mod kinematics;
 mod math;
 mod ui;
-mod urdf;
 mod convert;
+mod robot;
 
 fn main() {
     let mut app = App::new();
@@ -33,7 +33,7 @@ fn main() {
         // update
     ));
 
-    app.add_systems(FixedUpdate, urdf::init_robots
+    app.add_systems(FixedUpdate, robot::systems::init_robots
         .in_set(PhysicsSet::SyncBackend)
         .after(init_rigid_bodies)
         .after(init_colliders)

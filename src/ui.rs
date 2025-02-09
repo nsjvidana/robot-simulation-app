@@ -1,7 +1,7 @@
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
-use crate::urdf::{Robot, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Camera3d, Commands, Entity, GlobalTransform, Local, MouseButton, Name, Query, Res, Single, Window};
+use crate::robot::{Robot, RobotPart};
+use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, Local, MouseButton, Name, Query, Res, Single, Window};
 use bevy_egui::egui::ComboBox;
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
