@@ -1,4 +1,4 @@
-use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Res, Startup, Update};
+use bevy::prelude::{ButtonInput, FixedPreUpdate, FixedUpdate, IntoSystemConfigs, KeyCode, Res, Startup, Update};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -8,6 +8,7 @@ use bevy_rapier3d::prelude::RapierDebugRenderPlugin;
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
 use math::Real;
+use crate::ui::RobotLabUiPlugin;
 
 mod kinematics;
 mod math;
@@ -25,14 +26,11 @@ fn main() {
         // SalvaPhysicsPlugin::new(),
         WorldInspectorPlugin::default(),
         // EguiPlugin,
+        RobotLabUiPlugin::new(Update),
         NoCameraPlayerPlugin,
     ));
 
     app.add_systems(Startup, startup);
-    app.add_systems(Update, (
-        ui::ik_sandbox_ui,
-        // update
-    ));
 
     app.add_systems(FixedUpdate, robot::systems::init_robots
         .in_set(PhysicsSet::SyncBackend)

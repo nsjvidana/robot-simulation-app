@@ -1,13 +1,40 @@
+use bevy::app::{App, Update};
+use bevy::ecs::intern::Interned;
+use bevy::ecs::schedule::ScheduleLabel;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
 use crate::robot::{Robot, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, Local, MouseButton, Name, Query, Res, Single, Window};
+use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
-use bevy_rapier3d::prelude::{QueryFilter, ReadDefaultRapierContext};
+use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, ReadDefaultRapierContext};
 use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
+use crate::ui;
+
+pub struct RobotLabUiPlugin {
+    schedule: Interned<dyn ScheduleLabel>,
+}
+
+impl RobotLabUiPlugin {
+    pub fn new(schedule: impl ScheduleLabel) -> Self {
+        Self {
+            schedule: schedule.intern()
+        }
+    }
+}
+
+impl Plugin for RobotLabUiPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<PhysicsSimUi>();
+
+        app.add_systems(self.schedule, (
+            ik_sandbox_ui.before(PhysicsSet::SyncBackend),
+            // update
+        ));
+    }
+}
 
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,
@@ -58,9 +85,23 @@ impl Default for IKSandboxUIState {
     }
 }
 
+#[derive(Resource)]
+pub struct PhysicsSimUi {
+    pub physics_enabled: bool,
+}
+
+impl Default for PhysicsSimUi {
+    fn default() -> Self {
+        Self {
+            physics_enabled: false,
+        }
+    }
+}
+
 pub fn ik_sandbox_ui(
     mut ctxs: EguiContexts,
     mut ui_data: Local<IKSandboxUI>,
+    mut physics_sim_ui_data: ResMut<PhysicsSimUi>,
     mut ui_state: Local<IKSandboxUIState>,
     mut commands: Commands,
     robot_part_q: Query<&RobotPart>,
@@ -101,6 +142,13 @@ pub fn ik_sandbox_ui(
                 ui,
                 &mut ui_data,
                 &mut ui_state,
+            );
+
+            physics_sim_ui(
+                ui,
+                &mut ui_data,
+                &mut ui_state,
+                &mut physics_sim_ui_data
             );
         }
     );
@@ -208,5 +256,24 @@ fn robot_ik_ui(
             );
 
         });
+    });
+}
+
+fn physics_sim_ui(
+    ui: &mut Ui,
+    ui_data: &mut IKSandboxUI,
+    ui_state: &mut IKSandboxUIState,
+    physics_sim_ui_data: &mut PhysicsSimUi,
+) {
+    ui.collapsing("Physics", |ui| {
+        let pause_toggle = ui.button(
+        if physics_sim_ui_data.physics_enabled { "Pause" }
+            else { "Play" }
+        );
+        let step = ui.button("Step Once");
+
+        if pause_toggle.clicked() {
+            physics_sim_ui_data.physics_enabled = !physics_sim_ui_data.physics_enabled;
+        }
     });
 }
