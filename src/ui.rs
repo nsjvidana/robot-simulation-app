@@ -6,7 +6,7 @@ use bevy::math::Vec3;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
 use crate::robot::{Robot, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Color, Commands, Entity, Gizmos, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, With, Without};
+use bevy::prelude::{ButtonInput, Camera, Color, Commands, DetectChanges, Entity, Gizmos, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Time, Window, With, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -41,16 +41,11 @@ impl Plugin for RobotLabUiPlugin {
     }
 }
 
-//TODO: separate ik, sim, and import stuff into separate structs
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,
     pub solvers: Vec<Box<dyn InverseKinematicsSolver<Real> + Send>>,
     pub solver_names: Vec<String>,
-
-    pub mb_loader_options: UrdfMultibodyOptions,
-
-    pub selected_robot: Option<Entity>,
-    pub selected_entity: Option<Entity>,
+    pub selected_solver_idx: usize,
 }
 
 impl Default for IKSandboxUI {
@@ -65,23 +60,21 @@ impl Default for IKSandboxUI {
                 "Forward Ascent Cyclic".to_string(),
                 "Forward Descent Cyclic".to_string(),
             ],
-            mb_loader_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
-            selected_robot: None,
-            selected_entity: None,
+            selected_solver_idx: 0,
         }
     }
 }
 
-pub struct IKSandboxUIState {
-    pub selected_solver_idx: usize,
+pub struct RobotImportUI {
+    pub mb_loader_options: UrdfMultibodyOptions,
     pub urdf_loader_options: UrdfLoaderOptions,
     pub selected_joint_type: usize,
 }
 
-impl Default for IKSandboxUIState {
+impl Default for RobotImportUI {
     fn default() -> Self {
         Self {
-            selected_solver_idx: 0,
+            mb_loader_options: UrdfMultibodyOptions::default(),
             urdf_loader_options: UrdfLoaderOptions {
                 create_colliders_from_visual_shapes: true,
                 create_colliders_from_collision_shapes: false,
@@ -93,6 +86,27 @@ impl Default for IKSandboxUIState {
             selected_joint_type: 0
         }
     }
+}
+
+pub struct ToolbarUI {
+    pub toolbar_state: ToolbarState,
+    pub selected_robot: Option<Entity>,
+    pub selected_entity: Option<Entity>,
+}
+
+impl Default for ToolbarUI {
+    fn default() -> Self {
+        Self {
+            selected_entity: None,
+            selected_robot: None,
+            toolbar_state: ToolbarState::Grab
+        }
+    }
+}
+
+pub enum ToolbarState {
+    Grab,
+    Rotate,
 }
 
 #[derive(Resource)]
@@ -124,9 +138,10 @@ pub enum ResettedSnapshotState {
 
 pub fn robot_sandbox_ui(
     mut ctxs: EguiContexts,
-    mut ui_data: Local<IKSandboxUI>,
-    mut physics_sim_ui_data: ResMut<PhysicsSimUi>,
-    mut ui_state: Local<IKSandboxUIState>,
+    mut ik_ui: Local<IKSandboxUI>,
+    mut physics_sim: ResMut<PhysicsSimUi>,
+    mut importing_ui: Local<RobotImportUI>,
+    mut toolbar_ui: Local<ToolbarUI>,
     mut commands: Commands,
     robot_part_q: Query<&RobotPart>,
     transform_q: Query<&GlobalTransform>,
@@ -146,22 +161,22 @@ pub fn robot_sandbox_ui(
             rapier_context,
         );
         if let Some(clicked_entity) = clicked_entity {
-            ui_data.selected_entity = Some(clicked_entity);
+            toolbar_ui.selected_entity = Some(clicked_entity);
 
             if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
-                ui_data.selected_robot = Some(robot_entity);
+                toolbar_ui.selected_robot = Some(robot_entity);
             }
             else {
-                ui_data.selected_robot = None;
+                toolbar_ui.selected_robot = None;
             }
         }
         else {
-            ui_data.selected_entity = None;
-            ui_data.selected_robot = None;
+            toolbar_ui.selected_entity = None;
+            toolbar_ui.selected_robot = None;
         }
     }
 
-    if let Some(robot_entity) = ui_data.selected_robot {
+    if let Some(robot_entity) = toolbar_ui.selected_robot {
         //print robot name to console
         if let Ok(name) = name_q.get(robot_entity) {
             println!("{}", name);
@@ -182,20 +197,18 @@ pub fn robot_sandbox_ui(
             robot_import_ui(
                 &mut commands,
                 ui,
-                &mut ui_data,
-                &mut ui_state,
+                &mut importing_ui,
             );
 
             //Inverse Kinematics
             robot_ik_ui(
                 ui,
-                &mut ui_data,
-                &mut ui_state,
+                &mut ik_ui,
             );
 
             physics_sim_ui(
                 ui,
-                &mut physics_sim_ui_data,
+                &mut physics_sim,
             );
         }
     );
@@ -228,21 +241,20 @@ fn get_clicked_entity(
 fn robot_import_ui(
     commands: &mut Commands,
     ui: &mut Ui,
-    ui_data: &mut IKSandboxUI,
-    ui_state: &mut IKSandboxUIState,
+    importing_ui: &mut RobotImportUI,
 ) {
     ui.collapsing("Import Robot", |ui| {
         let _checkbox = ui.checkbox(
-            &mut ui_state.urdf_loader_options.make_roots_fixed,
+            &mut importing_ui.urdf_loader_options.make_roots_fixed,
             "Make roots fixed"
         );
         ComboBox::from_label("Robot joint type")
-            .selected_text(match ui_state.selected_joint_type {
+            .selected_text(match importing_ui.selected_joint_type {
                 0 => "Impulse", 1 => "Multibody", _ => unreachable!()
             })
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut ui_state.selected_joint_type, 0, "Impulse");
-                ui.selectable_value(&mut ui_state.selected_joint_type, 1, "Multibody");
+                ui.selectable_value(&mut importing_ui.selected_joint_type, 0, "Impulse");
+                ui.selectable_value(&mut importing_ui.selected_joint_type, 1, "Multibody");
             });
         let button = ui.button("Import URDF file");
         if button.clicked() { //import urdf robot via file dialog
@@ -254,14 +266,14 @@ fn robot_import_ui(
                     .to_str().unwrap().to_string();
                 let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
                     path,
-                    ui_state.urdf_loader_options.clone(),
+                    importing_ui.urdf_loader_options.clone(),
                     None
                 ).unwrap();
                 let robot_cmp = Robot::new(robot);
                 commands.spawn((
-                    match ui_state.selected_joint_type {
+                    match importing_ui.selected_joint_type {
                         0 => robot_cmp.with_impulse_joints(),
-                        1 => robot_cmp.with_multibody_joints(ui_data.mb_loader_options),
+                        1 => robot_cmp.with_multibody_joints(importing_ui.mb_loader_options),
                         _ => unreachable!()
                     },
                     Name::new(robot_name)
@@ -273,21 +285,20 @@ fn robot_import_ui(
 
 fn robot_ik_ui(
     ui: &mut Ui,
-    ui_data: &mut IKSandboxUI,
-    ui_state: &mut IKSandboxUIState,
+    ik_ui: &mut IKSandboxUI,
 ) {
     ui.collapsing("Inverse Kinematics", |ui| {
-        let solver_idx = ui_state.selected_solver_idx;
+        let solver_idx = ik_ui.selected_solver_idx;
         let selected_solver_name =
-            if ui_data.solvers.get(solver_idx).is_some() {
-                ui_data.solver_names.get(solver_idx).unwrap()
+            if ik_ui.solvers.get(solver_idx).is_some() {
+                ik_ui.solver_names.get(solver_idx).unwrap()
             }
             else { &"-".to_string() };
         ComboBox::from_label("Solver type")
             .selected_text(selected_solver_name)
             .show_ui(ui, |ui| {
-                for (i, solver_name) in ui_data.solver_names.iter().enumerate() {
-                    ui.selectable_value(&mut ui_state.selected_solver_idx, i, solver_name);
+                for (i, solver_name) in ik_ui.solver_names.iter().enumerate() {
+                    ui.selectable_value(&mut ik_ui.selected_solver_idx, i, solver_name);
                 }
             });
 
@@ -295,7 +306,7 @@ fn robot_ik_ui(
 
             ui.label("Chain:");
             let _ = ui.button(
-                if ui_data.kinematic_chain.is_some() {"Chain" }
+                if ik_ui.kinematic_chain.is_some() {"Chain" }
                 else { "N/A" }
             );
 
@@ -305,35 +316,35 @@ fn robot_ik_ui(
 
 fn physics_sim_ui(
     ui: &mut Ui,
-    physics_sim_ui_data: &mut PhysicsSimUi,
+    physics_sim: &mut PhysicsSimUi,
 ) {
     ui.collapsing("Physics", |ui| {
         let pause_toggle = ui.button(
-        if physics_sim_ui_data.physics_enabled { "Pause" }
+        if physics_sim.physics_enabled { "Pause" }
             else { "Play" }
         );
         let step = ui.button("Step Once");
         let reset = ui.button("Reset");
 
         if pause_toggle.clicked() {
-            physics_sim_ui_data.physics_enabled = !physics_sim_ui_data.physics_enabled;
+            physics_sim.physics_enabled = !physics_sim.physics_enabled;
         }
-        physics_sim_ui_data.sim_step_pressed = step.clicked();
+        physics_sim.sim_step_pressed = step.clicked();
 
         if reset.clicked() {
-            physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::LoadSnapshot;
-            physics_sim_ui_data.sim_resetted = true;
-            physics_sim_ui_data.physics_enabled = false;
-            physics_sim_ui_data.sim_step_pressed = false;
+            physics_sim.resetted_snapshot_state = ResettedSnapshotState::LoadSnapshot;
+            physics_sim.sim_resetted = true;
+            physics_sim.physics_enabled = false;
+            physics_sim.sim_step_pressed = false;
         }
-        else if physics_sim_ui_data.physics_enabled || physics_sim_ui_data.sim_step_pressed { //saving snapshot / handling resetted state
-            if physics_sim_ui_data.sim_resetted {
-                physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::SaveSnapshot;
+        else if physics_sim.physics_enabled || physics_sim.sim_step_pressed { //saving snapshot / handling resetted state
+            if physics_sim.sim_resetted {
+                physics_sim.resetted_snapshot_state = ResettedSnapshotState::SaveSnapshot;
             }
-            physics_sim_ui_data.sim_resetted = false;
+            physics_sim.sim_resetted = false;
         }
 
-        ui.label(if physics_sim_ui_data.sim_resetted { "Resetted" }
+        ui.label(if physics_sim.sim_resetted { "Resetted" }
         else { "Unresetted" });
     });
 }
@@ -378,7 +389,7 @@ fn control_physics_sim(
 }
 
 pub fn edit_timestep_mode(
-    mut rapier_timestep_mode: ResMut<TimestepMode>
+    mut rapier_timestep_mode: ResMut<TimestepMode>,
 ) {
     //TODO: let user edit dt
 }
