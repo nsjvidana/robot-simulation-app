@@ -1,14 +1,15 @@
-use bevy::prelude::{ButtonInput, FixedPreUpdate, FixedUpdate, IntoSystemConfigs, KeyCode, Res, Startup, Update};
+use std::ops::DerefMut;
+use bevy::prelude::{ButtonInput, FixedPreUpdate, FixedUpdate, IntoSystemConfigs, KeyCode, PreStartup, Query, Res, ResMut, Startup, Update, With};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
 use bevy_rapier3d::plugin::PhysicsSet;
-use bevy_rapier3d::prelude::RapierDebugRenderPlugin;
+use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteDefaultRapierContext};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
 use math::Real;
-use crate::ui::RobotLabUiPlugin;
+use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
 
 mod kinematics;
 mod math;
@@ -19,6 +20,12 @@ mod robot;
 
 fn main() {
     let mut app = App::new();
+
+    app.insert_resource(TimestepMode::Fixed {
+        dt: 1.0 / 60.0,
+        substeps: 1
+    });
+
     app.add_plugins((
         DefaultPlugins,
         RapierPhysicsPlugin::<()>::default()
@@ -33,12 +40,14 @@ fn main() {
 
     app.add_systems(Startup, startup);
 
-    app.add_systems(FixedUpdate, robot::systems::init_robots
-        .in_set(PhysicsSet::SyncBackend)
-        .after(init_rigid_bodies)
-        .after(init_colliders)
-        .after(init_joints)
-    );
+    app.add_systems(FixedUpdate, (
+        edit_timestep_mode.before(PhysicsSet::SyncBackend),
+        robot::systems::init_robots
+            .in_set(PhysicsSet::SyncBackend)
+            .after(init_rigid_bodies)
+            .after(init_colliders)
+            .after(init_joints),
+    ));
 
     app.run();
 }

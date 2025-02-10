@@ -199,7 +199,6 @@ pub fn init_robots(
             });
         }
 
-        //TODO: Add MultibodyJoint components
         for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
             if joint.is_none() { continue; }
 

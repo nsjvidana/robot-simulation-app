@@ -9,6 +9,7 @@ use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, Into
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
+use bevy_rapier3d::plugin::TimestepMode;
 use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, ReadDefaultRapierContext};
 use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
@@ -31,7 +32,7 @@ impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PhysicsSimUi>();
 
-        app.add_systems(self.schedule, ik_sandbox_ui)
+        app.add_systems(self.schedule, robot_sandbox_ui)
             .add_systems(self.physics_schedule, control_physics_sim
                 .before(PhysicsSet::StepSimulation)
                 .after(PhysicsSet::SyncBackend)
@@ -115,7 +116,7 @@ pub enum ResettedSnapshotState {
     Idle
 }
 
-pub fn ik_sandbox_ui(
+pub fn robot_sandbox_ui(
     mut ctxs: EguiContexts,
     mut ui_data: Local<IKSandboxUI>,
     mut physics_sim_ui_data: ResMut<PhysicsSimUi>,
@@ -126,9 +127,9 @@ pub fn ik_sandbox_ui(
     camera: Single<(&Camera, &GlobalTransform)>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
-    default_rapier_context_q: Query<(Entity, &RapierContext), With<DefaultRapierContext>>,
+    default_rapier_context_q: Query<&RapierContext, With<DefaultRapierContext>>,
 ) {
-    let (rapier_context_entity, rapier_context) = default_rapier_context_q.single();
+    let rapier_context = default_rapier_context_q.single();
     let clicked_entity = get_clicked_entity(
         camera,
         mouse_button_input,
@@ -163,11 +164,8 @@ pub fn ik_sandbox_ui(
             );
 
             physics_sim_ui(
-                &mut commands,
-                rapier_context_entity,
                 ui,
                 &mut physics_sim_ui_data,
-                rapier_context
             );
         }
     );
@@ -279,11 +277,8 @@ fn robot_ik_ui(
 }
 
 fn physics_sim_ui(
-    commands: &mut Commands,
-    rapier_context_entity: Entity,
     ui: &mut Ui,
     physics_sim_ui_data: &mut PhysicsSimUi,
-    rapier_context: &RapierContext,
 ) {
     ui.collapsing("Physics", |ui| {
         let pause_toggle = ui.button(
@@ -299,7 +294,6 @@ fn physics_sim_ui(
         physics_sim_ui_data.sim_step_pressed = step.clicked();
 
         if reset.clicked() {
-            //TODO: load resetted snapshot
             physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::LoadSnapshot;
             physics_sim_ui_data.sim_resetted = true;
             physics_sim_ui_data.physics_enabled = false;
@@ -307,7 +301,6 @@ fn physics_sim_ui(
         }
         else if physics_sim_ui_data.physics_enabled || physics_sim_ui_data.sim_step_pressed { //saving snapshot / handling resetted state
             if physics_sim_ui_data.sim_resetted {
-                //TODO: save snapshot before sim plays after being resetted
                 physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::SaveSnapshot;
             }
             physics_sim_ui_data.sim_resetted = false;
@@ -319,14 +312,13 @@ fn physics_sim_ui(
 }
 
 fn control_physics_sim(
-    mut commands: Commands,
     mut rapier_config_q: Query<
-        (Entity, &mut RapierConfiguration, &mut RapierContext),
+        (&mut RapierConfiguration, &mut RapierContext),
         With<DefaultRapierContext>
     >,
     mut physics_sim_ui_data: ResMut<PhysicsSimUi>
 ) {
-    let (rapier_context_entity, mut config, mut rapier_context) = rapier_config_q.single_mut();
+    let (mut config, mut rapier_context) = rapier_config_q.single_mut();
 
     match physics_sim_ui_data.resetted_snapshot_state {
         ResettedSnapshotState::LoadSnapshot => {
@@ -356,4 +348,10 @@ fn control_physics_sim(
         if physics_sim_ui_data.sim_step_pressed { config.physics_pipeline_active = true; }
         else { config.physics_pipeline_active = false; } //stop sim if step wasn't pressed.
     }
+}
+
+pub fn edit_timestep_mode(
+    mut rapier_timestep_mode: ResMut<TimestepMode>
+) {
+    //TODO: let user edit dt
 }
