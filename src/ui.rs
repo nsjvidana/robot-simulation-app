@@ -1,3 +1,4 @@
+use std::ops::DerefMut;
 use bevy::app::{App, Update};
 use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
@@ -8,10 +9,9 @@ use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, Into
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
-use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, ReadDefaultRapierContext};
+use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, ReadDefaultRapierContext};
 use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use crate::ui;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -31,8 +31,11 @@ impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PhysicsSimUi>();
 
-        app.add_systems(self.schedule, ik_sandbox_ui.before(PhysicsSet::SyncBackend))
-            .add_systems(self.physics_schedule, control_physics_sim.before(PhysicsSet::SyncBackend));
+        app.add_systems(self.schedule, ik_sandbox_ui)
+            .add_systems(self.physics_schedule, control_physics_sim
+                .before(PhysicsSet::StepSimulation)
+                .after(PhysicsSet::SyncBackend)
+            );
     }
 }
 
@@ -88,16 +91,28 @@ impl Default for IKSandboxUIState {
 #[derive(Resource)]
 pub struct PhysicsSimUi {
     pub physics_enabled: bool,
-    pub sim_step_pressed: bool
+    pub sim_step_pressed: bool,
+    pub sim_resetted: bool,
+    pub resetted_snapshot: Option<Vec<u8>>,
+    pub resetted_snapshot_state: ResettedSnapshotState
 }
 
 impl Default for PhysicsSimUi {
     fn default() -> Self {
         Self {
             physics_enabled: false,
-            sim_step_pressed: false
+            sim_step_pressed: false,
+            sim_resetted: true,
+            resetted_snapshot: None,
+            resetted_snapshot_state: ResettedSnapshotState::Idle,
         }
     }
+}
+
+pub enum ResettedSnapshotState {
+    LoadSnapshot,
+    SaveSnapshot,
+    Idle
 }
 
 pub fn ik_sandbox_ui(
@@ -111,8 +126,9 @@ pub fn ik_sandbox_ui(
     camera: Single<(&Camera, &GlobalTransform)>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
-    rapier_context: ReadDefaultRapierContext
+    default_rapier_context_q: Query<(Entity, &RapierContext), With<DefaultRapierContext>>,
 ) {
+    let (rapier_context_entity, rapier_context) = default_rapier_context_q.single();
     let clicked_entity = get_clicked_entity(
         camera,
         mouse_button_input,
@@ -147,8 +163,11 @@ pub fn ik_sandbox_ui(
             );
 
             physics_sim_ui(
+                &mut commands,
+                rapier_context_entity,
                 ui,
-                &mut physics_sim_ui_data
+                &mut physics_sim_ui_data,
+                rapier_context
             );
         }
     );
@@ -159,7 +178,7 @@ fn get_clicked_entity(
     camera: Single<(&Camera, &GlobalTransform)>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
-    rapier_context: ReadDefaultRapierContext
+    rapier_context: &RapierContext
 ) -> Option<Entity> {
     if mouse_button_input.just_pressed(MouseButton::Left) {
         let (camera, camera_transform) = *camera;
@@ -260,8 +279,11 @@ fn robot_ik_ui(
 }
 
 fn physics_sim_ui(
+    commands: &mut Commands,
+    rapier_context_entity: Entity,
     ui: &mut Ui,
     physics_sim_ui_data: &mut PhysicsSimUi,
+    rapier_context: &RapierContext,
 ) {
     ui.collapsing("Physics", |ui| {
         let pause_toggle = ui.button(
@@ -269,30 +291,69 @@ fn physics_sim_ui(
             else { "Play" }
         );
         let step = ui.button("Step Once");
+        let reset = ui.button("Reset");
 
         if pause_toggle.clicked() {
             physics_sim_ui_data.physics_enabled = !physics_sim_ui_data.physics_enabled;
         }
         physics_sim_ui_data.sim_step_pressed = step.clicked();
+
+        if reset.clicked() {
+            //TODO: load resetted snapshot
+            physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::LoadSnapshot;
+            physics_sim_ui_data.sim_resetted = true;
+            physics_sim_ui_data.physics_enabled = false;
+            physics_sim_ui_data.sim_step_pressed = false;
+        }
+        else if physics_sim_ui_data.physics_enabled || physics_sim_ui_data.sim_step_pressed { //saving snapshot / handling resetted state
+            if physics_sim_ui_data.sim_resetted {
+                //TODO: save snapshot before sim plays after being resetted
+                physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::SaveSnapshot;
+            }
+            physics_sim_ui_data.sim_resetted = false;
+        }
+
+        ui.label(if physics_sim_ui_data.sim_resetted { "Resetted" }
+        else { "Unresetted" });
     });
 }
 
 fn control_physics_sim(
-    mut rapier_config_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
-    mut physics_sim_ui: ResMut<PhysicsSimUi>
+    mut commands: Commands,
+    mut rapier_config_q: Query<
+        (Entity, &mut RapierConfiguration, &mut RapierContext),
+        With<DefaultRapierContext>
+    >,
+    mut physics_sim_ui_data: ResMut<PhysicsSimUi>
 ) {
-    let mut config = rapier_config_q.single_mut();
-    if physics_sim_ui.physics_enabled {
+    let (rapier_context_entity, mut config, mut rapier_context) = rapier_config_q.single_mut();
+
+    match physics_sim_ui_data.resetted_snapshot_state {
+        ResettedSnapshotState::LoadSnapshot => {
+            physics_sim_ui_data.physics_enabled = false;
+            if let Some(serialized_ctx) = &physics_sim_ui_data.resetted_snapshot {
+                let resetted_ctx = bincode::deserialize::<RapierContext>(serialized_ctx).unwrap();
+                let _ = std::mem::replace(rapier_context.deref_mut(), resetted_ctx);
+            }
+        },
+        ResettedSnapshotState::SaveSnapshot => {
+            physics_sim_ui_data.resetted_snapshot = Some(bincode::serialize(&*rapier_context).unwrap());
+        },
+        ResettedSnapshotState::Idle => {}
+    }
+    physics_sim_ui_data.resetted_snapshot_state = ResettedSnapshotState::Idle;
+
+    if physics_sim_ui_data.physics_enabled {
         //pause sim if step btn was pressed while sim was enabled
-        if physics_sim_ui.sim_step_pressed {
-            physics_sim_ui.physics_enabled = false;
+        if physics_sim_ui_data.sim_step_pressed {
+            physics_sim_ui_data.physics_enabled = false;
             config.physics_pipeline_active = false;
         }
         else { config.physics_pipeline_active = true; } //if step not pressed, continue sim as usual.
     }
     else {
         //run sim for this frame only if the step btn was pressed while sim was disabled
-        if physics_sim_ui.sim_step_pressed { config.physics_pipeline_active = true; }
+        if physics_sim_ui_data.sim_step_pressed { config.physics_pipeline_active = true; }
         else { config.physics_pipeline_active = false; } //stop sim if step wasn't pressed.
     }
 }
