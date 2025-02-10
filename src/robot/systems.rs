@@ -246,8 +246,10 @@ pub fn init_robots(
             }
         }
 
-        commands.entity(robot_entity).insert(RobotEntities {
+        commands.entity(robot_entity)
+            .insert(RobotEntities {
             link_entities: robot_links,
-        });
+        })
+            .insert_if_new(Transform::default());
     }
 }

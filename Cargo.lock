@@ -1147,18 +1147,6 @@ checksum = "aa65df6a190b7dfc84d79f09cf02d47ae046fa86a613e202c31559e06d8d3710"
 [[package]]
 name = "bevy_rapier3d"
 version = "0.28.0"
-dependencies = [
- "bevy",
- "bitflags 2.8.0",
- "log",
- "nalgebra",
- "rapier3d",
- "serde",
-]
-
-[[package]]
-name = "bevy_rapier3d"
-version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65fff77c1e3140f8fa9d08632841f42cbef06e4ad98ba61d65a6297369bad763"
 dependencies = [
@@ -1167,6 +1155,7 @@ dependencies = [
  "log",
  "nalgebra",
  "rapier3d",
+ "serde",
 ]
 
 [[package]]
@@ -1268,7 +1257,7 @@ name = "bevy_salva3d"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_rapier3d 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bevy_rapier3d",
  "bitflags 2.8.0",
  "nalgebra",
  "salva3d",
@@ -4439,7 +4428,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_egui",
  "bevy_flycam",
- "bevy_rapier3d 0.28.0",
+ "bevy_rapier3d",
  "bevy_salva3d",
  "bincode",
  "k",

@@ -2,10 +2,11 @@ use std::ops::DerefMut;
 use bevy::app::{App, Update};
 use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
+use bevy::math::Vec3;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
 use crate::robot::{Robot, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Commands, Entity, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, With, Without};
+use bevy::prelude::{ButtonInput, Camera, Color, Commands, Entity, Gizmos, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Window, With, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -40,12 +41,16 @@ impl Plugin for RobotLabUiPlugin {
     }
 }
 
+//TODO: separate ik, sim, and import stuff into separate structs
 pub struct IKSandboxUI {
     pub kinematic_chain: Option<SerialChain<Real>>,
     pub solvers: Vec<Box<dyn InverseKinematicsSolver<Real> + Send>>,
     pub solver_names: Vec<String>,
+
     pub mb_loader_options: UrdfMultibodyOptions,
-    pub selected_robot: Option<Entity>
+
+    pub selected_robot: Option<Entity>,
+    pub selected_entity: Option<Entity>,
 }
 
 impl Default for IKSandboxUI {
@@ -61,7 +66,8 @@ impl Default for IKSandboxUI {
                 "Forward Descent Cyclic".to_string(),
             ],
             mb_loader_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
-            selected_robot: None
+            selected_robot: None,
+            selected_entity: None,
         }
     }
 }
@@ -123,25 +129,49 @@ pub fn robot_sandbox_ui(
     mut ui_state: Local<IKSandboxUIState>,
     mut commands: Commands,
     robot_part_q: Query<&RobotPart>,
+    transform_q: Query<&GlobalTransform>,
     name_q: Query<&Name>,
     camera: Single<(&Camera, &GlobalTransform)>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     default_rapier_context_q: Query<&RapierContext, With<DefaultRapierContext>>,
+    mut gizmos: Gizmos,
 ) {
     let rapier_context = default_rapier_context_q.single();
-    let clicked_entity = get_clicked_entity(
-        camera,
-        mouse_button_input,
-        window,
-        rapier_context,
-    );
 
-    if let Some(entity) = clicked_entity {
-        if let Ok(robot_entity) = robot_part_q.get(entity).map(|v| v.0) {
-            if let Ok(name) = name_q.get(robot_entity) {
-                println!("{}", name);
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let clicked_entity = get_clicked_entity(
+            camera,
+            window,
+            rapier_context,
+        );
+        if let Some(clicked_entity) = clicked_entity {
+            ui_data.selected_entity = Some(clicked_entity);
+
+            if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
+                ui_data.selected_robot = Some(robot_entity);
             }
+            else {
+                ui_data.selected_robot = None;
+            }
+        }
+        else {
+            ui_data.selected_entity = None;
+            ui_data.selected_robot = None;
+        }
+    }
+
+    if let Some(robot_entity) = ui_data.selected_robot {
+        //print robot name to console
+        if let Ok(name) = name_q.get(robot_entity) {
+            println!("{}", name);
+        }
+        //draw move gizmos
+        if let Ok(robot_transform) = transform_q.get(robot_entity) {
+            let robot_pos = robot_transform.translation(); 
+            gizmos.arrow(robot_pos, robot_pos + Vec3::X, Color::linear_rgba(1., 0., 0., 1.));
+            gizmos.arrow(robot_pos, robot_pos + Vec3::Y, Color::linear_rgba(0., 1., 0., 1.));
+            gizmos.arrow(robot_pos, robot_pos + Vec3::Z, Color::linear_rgba(1., 0., 1., 1.));
         }
     }
 
@@ -174,25 +204,22 @@ pub fn robot_sandbox_ui(
 // Gets the entity clicked in the current frame. Returns None if no entity was clicked.
 fn get_clicked_entity(
     camera: Single<(&Camera, &GlobalTransform)>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     rapier_context: &RapierContext
 ) -> Option<Entity> {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let (camera, camera_transform) = *camera;
-        if let Some(pos) = window
-            .cursor_position()
-            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
-        {
-            if let Some((rb_ent, _)) = rapier_context.cast_ray(
-                pos.origin,
-                pos.direction.as_vec3(),
-                1000.0,
-                true,
-                QueryFilter::default()
-            ) {
-                return Some(rb_ent);
-            }
+    let (camera, camera_transform) = *camera;
+    if let Some(pos) = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
+    {
+        if let Some((rb_ent, _)) = rapier_context.cast_ray(
+            pos.origin,
+            pos.direction.as_vec3(),
+            1000.0,
+            true,
+            QueryFilter::default()
+        ) {
+            return Some(rb_ent);
         }
     }
     None
