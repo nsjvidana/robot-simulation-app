@@ -355,27 +355,32 @@ fn physics_sim_ui(
 }
 
 fn control_physics_sim(
+    mut commands: Commands,
     mut rapier_config_q: Query<
         (&mut RapierConfiguration, &mut RapierContext),
         With<DefaultRapierContext>
     >,
     mut physics_sim_ui_data: ResMut<PhysicsSimUi>,
+    mut robot_set: ResMut<RobotSet>
 ) {
     let (mut config, mut rapier_context) = rapier_config_q.single_mut();
 
-    //TODO: reset robot entity data
     match physics_sim_ui_data.resetted_snapshot_state {
         ResettedSnapshotState::LoadSnapshot => {
             physics_sim_ui_data.physics_enabled = false;
             if let Some(snapshot) = &physics_sim_ui_data.resetted_snapshot {
                 let resetted_ctx = bincode::deserialize::<RapierContext>(&snapshot.rapier_context).unwrap();
                 let _ = std::mem::replace(rapier_context.deref_mut(), resetted_ctx);
+                let resetted_robot_set = bincode::deserialize::<RobotSet>(&snapshot.rapier_context).unwrap();
+                for robot_data in resetted_robot_set.robots.iter().map(|v| v.1) {
+                    commands.entity(robot_data.robot_entity).insert(robot_data.transform);
+                }
             }
         },
         ResettedSnapshotState::SaveSnapshot => {
             physics_sim_ui_data.resetted_snapshot = Some(RobotSimSnapshot {
                 rapier_context: bincode::serialize(&*rapier_context).unwrap(),
-                robots: vec![]
+                robots: bincode::serialize(&*robot_set).unwrap(),
             });
         },
         ResettedSnapshotState::Idle => {}

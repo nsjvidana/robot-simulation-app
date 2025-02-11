@@ -1,7 +1,8 @@
 use bevy::app::App;
-use bevy::prelude::{Component, Entity, Plugin, Resource, Transform};
+use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot};
+use serde::{Deserialize, Serialize};
 
 pub mod systems;
 
@@ -13,9 +14,17 @@ impl Plugin for RobotPlugin {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Serialize, Deserialize)]
 pub struct RobotSet {
-    pub robots: Arena<RobotEntities>,
+    pub robots: Arena<RobotSerData>,
+}
+
+/// Data for serializing the state of the robot sim
+#[derive(Serialize, Deserialize)]
+pub struct RobotSerData {
+    pub robot_entity: Entity,
+    pub entities: RobotEntities,
+    pub transform: GlobalTransform
 }
 
 #[derive(Component)]
@@ -54,6 +63,7 @@ impl Default for RobotJointType {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct RobotEntities {
     link_entities: Vec<RobotLink>,
 }
@@ -69,6 +79,7 @@ pub struct LinkEntity {
 #[derive(Component)]
 pub struct RobotPart(pub Entity);
 
+#[derive(Serialize, Deserialize)]
 pub struct RobotLink {
     rigid_body: Entity,
     colliders: Vec<Entity>,

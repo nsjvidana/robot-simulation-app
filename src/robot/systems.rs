@@ -80,13 +80,16 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
-    mut robot_q: Query<(Entity, &mut Robot, Option<&RapierContextEntityLink>), Without<RobotHandle>>,
+    mut robot_q: Query<
+        (Entity, &mut Robot, Option<&RapierContextEntityLink>, Option<&GlobalTransform>),
+        Without<RobotHandle>
+    >,
     default_context_q: Query<Entity, With<DefaultRapierContext>>,
     mut context_q: Query<&mut RapierContext>,
     mut robot_set: ResMut<RobotSet>,
 ) {
     //TODO: parallelize this?
-    for (robot_entity, mut robot, ctx_link) in robot_q.iter_mut() {
+    for (robot_entity, mut robot, ctx_link, transform) in robot_q.iter_mut() {
         let context_link = RapierContextEntityLink(
             ctx_link.map_or_else(
                 || default_context_q.single(),
@@ -252,8 +255,12 @@ pub fn init_robots(
             }
         }
 
-        let robot_idx = robot_set.robots.insert(RobotEntities {
-            link_entities: robot_links,
+        let robot_idx = robot_set.robots.insert(RobotSerData {
+            robot_entity,
+            entities: RobotEntities {
+                link_entities: robot_links,
+            },
+            transform: transform.map_or_else(|| GlobalTransform::default(), |v| *v),
         });
         commands.entity(robot_entity)
             .insert(RobotHandle(robot_idx))
@@ -272,11 +279,12 @@ pub fn sync_robot_changes(
     >,
     mut robot_set: ResMut<RobotSet>
 ) {
-    for (transform, robot_handle) in changed_robot_transforms_q.iter() {
-        let robot_entities=  robot_set.robots.get(robot_handle.0).unwrap();
-        for RobotLink {rigid_body, initial_pos, ..} in robot_entities.link_entities.iter() {
+    for (new_transform, robot_handle) in changed_robot_transforms_q.iter() {
+        let robot_ser_data =  robot_set.robots.get_mut (robot_handle.0).unwrap();
+        for RobotLink {rigid_body, initial_pos, ..} in robot_ser_data.entities.link_entities.iter() {
             let mut rb_transform = rb_transform_q.get_mut(*rigid_body).unwrap();
-            let _ = std::mem::replace(rb_transform.deref_mut(), transform.mul_transform(*initial_pos));
+            let _ = std::mem::replace(rb_transform.deref_mut(), new_transform.mul_transform(*initial_pos));
         }
+        robot_ser_data.transform = *new_transform;
     }
 }
