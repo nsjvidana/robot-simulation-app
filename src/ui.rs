@@ -159,42 +159,6 @@ pub fn robot_sandbox_ui(
 ) {
     let rapier_context = default_rapier_context_q.single();
 
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let clicked_entity = get_clicked_entity(
-            camera,
-            window,
-            rapier_context,
-        );
-        if let Some(clicked_entity) = clicked_entity {
-            toolbar_ui.selected_entity = Some(clicked_entity);
-
-            if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
-                toolbar_ui.selected_robot = Some(robot_entity);
-            }
-            else {
-                toolbar_ui.selected_robot = None;
-            }
-        }
-        else {
-            toolbar_ui.selected_entity = None;
-            toolbar_ui.selected_robot = None;
-        }
-    }
-
-    if let Some(robot_entity) = toolbar_ui.selected_robot {
-        //print robot name to console
-        if let Ok(name) = name_q.get(robot_entity) {
-            println!("{}", name);
-        }
-        //draw move gizmos
-        if let Ok(robot_transform) = transform_q.get(robot_entity) {
-            let robot_pos = robot_transform.translation(); 
-            gizmos.arrow(robot_pos, robot_pos + Vec3::X, Color::linear_rgba(1., 0., 0., 1.));
-            gizmos.arrow(robot_pos, robot_pos + Vec3::Y, Color::linear_rgba(0., 1., 0., 1.));
-            gizmos.arrow(robot_pos, robot_pos + Vec3::Z, Color::linear_rgba(1., 0., 1., 1.));
-        }
-    }
-
     egui::Window::new("Robot Sandbox").show(
         ctxs.ctx_mut(), |ui| {
 
@@ -217,30 +181,63 @@ pub fn robot_sandbox_ui(
             );
         }
     );
-}
 
-// Gets the entity clicked in the current frame. Returns None if no entity was clicked.
-fn get_clicked_entity(
-    camera: Single<(&Camera, &GlobalTransform)>,
-    window: Single<&Window>,
-    rapier_context: &RapierContext
-) -> Option<Entity> {
-    let (camera, camera_transform) = *camera;
-    if let Some(pos) = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
-    {
-        if let Some((rb_ent, _)) = rapier_context.cast_ray(
-            pos.origin,
-            pos.direction.as_vec3(),
-            1000.0,
-            true,
-            QueryFilter::default()
-        ) {
-            return Some(rb_ent);
+    //Toolbar window
+    let toolbar_window = egui::Window::new("Toolbar").show(
+        ctxs.ctx_mut(), |ui| {
+            make_toolbar_ui(
+                ui,
+                &mut toolbar_ui,
+                rapier_context,
+                &robot_part_q,
+                &name_q,
+                &transform_q,
+                &camera,
+                &window,
+                &mouse_button_input,
+                &mut gizmos,
+            );
+        }
+    ).unwrap();
+
+    if !ctxs.ctx_mut().is_using_pointer() {
+        //capture selected entities
+        if mouse_button_input.just_pressed(MouseButton::Left) {
+            toolbar_ui.selected_entity = get_clicked_entity(
+                &*camera,
+                &window,
+                rapier_context,
+            );
+
+            //get selected robot if one was selected
+            if let Some(clicked_entity) = toolbar_ui.selected_entity {
+                if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
+                    toolbar_ui.selected_robot = Some(robot_entity);
+                }
+                else {
+                    toolbar_ui.selected_robot = None;
+                }
+            }
+            else {
+                toolbar_ui.selected_robot = None;
+            }
         }
     }
-    None
+
+    if let Some(robot_entity) = toolbar_ui.selected_robot {
+        //print robot name to console
+        if let Ok(name) = name_q.get(robot_entity) {
+            println!("{}", name);
+        }
+        //draw move gizmos
+        if let Ok(robot_transform) = transform_q.get(robot_entity) {
+            let robot_pos = robot_transform.translation();
+            gizmos.arrow(robot_pos, robot_pos + Vec3::X, Color::linear_rgba(1., 0., 0., 1.));
+            gizmos.arrow(robot_pos, robot_pos + Vec3::Y, Color::linear_rgba(0., 1., 0., 1.));
+            gizmos.arrow(robot_pos, robot_pos + Vec3::Z, Color::linear_rgba(1., 0., 1., 1.));
+        }
+    }
+
 }
 
 fn robot_import_ui(
@@ -400,6 +397,53 @@ fn control_physics_sim(
         if physics_sim_ui_data.sim_step_pressed { config.physics_pipeline_active = true; }
         else { config.physics_pipeline_active = false; } //stop sim if step wasn't pressed.
     }
+}
+
+// Gets the entity clicked in the current frame. Returns None if no entity was clicked.
+fn get_clicked_entity(
+    camera: &(&Camera, &GlobalTransform),
+    window: &Window,
+    rapier_context: &RapierContext
+) -> Option<Entity> {
+    let (camera, camera_transform) = *camera;
+    if let Some(pos) = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
+    {
+        if let Some((rb_ent, _)) = rapier_context.cast_ray(
+            pos.origin,
+            pos.direction.as_vec3(),
+            1000.0,
+            true,
+            QueryFilter::default()
+        ) {
+            return Some(rb_ent);
+        }
+    }
+    None
+}
+
+fn make_toolbar_ui(
+    ui: &mut Ui,
+    toolbar_ui: &mut ToolbarUI,
+    rapier_context: &RapierContext,
+    robot_part_q: &Query<&RobotPart>,
+    name_q: &Query<&Name>,
+    transform_q: &Query<&GlobalTransform>,
+    camera: &(&Camera, &GlobalTransform),
+    window: &Window,
+    mouse_button_input: &ButtonInput<MouseButton>,
+    gizmos: &mut Gizmos,
+) {
+    ui.horizontal(|ui| {
+        let mut grab = matches!(toolbar_ui.toolbar_state, ToolbarState::Grab);
+        let grap_resp = ui.toggle_value(&mut grab, "Grab");
+        let mut rotate = matches!(toolbar_ui.toolbar_state, ToolbarState::Rotate);
+        let rotate_resp = ui.toggle_value(&mut rotate, "Rotate");
+
+        if grab && grap_resp.clicked() { toolbar_ui.toolbar_state = ToolbarState::Grab; }
+        else if rotate && rotate_resp.clicked() { toolbar_ui.toolbar_state = ToolbarState::Rotate; }
+    });
 }
 
 pub fn edit_timestep_mode(
