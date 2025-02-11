@@ -9,6 +9,8 @@ use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDe
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
 use math::Real;
+use crate::robot::Robot;
+use crate::robot::systems::sync_robot_changes;
 use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
 
 mod kinematics;
@@ -39,9 +41,11 @@ fn main() {
     ));
 
     app.add_systems(Startup, startup);
+    app.add_systems(Update, update);
 
     app.add_systems(FixedUpdate, (
         edit_timestep_mode.before(PhysicsSet::SyncBackend),
+        sync_robot_changes.before(PhysicsSet::SyncBackend),
         robot::systems::init_robots
             .in_set(PhysicsSet::SyncBackend)
             .after(init_rigid_bodies)
@@ -58,14 +62,14 @@ pub struct TestComponent {
 }
 
 pub fn update(
-    // mut rapier_ctx_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
-    // keys: Res<ButtonInput<KeyCode>>,
-    time: Res<bevy::prelude::Time>
+    mut robot_q: Query<&mut Transform, With<Robot>>,
+    keys: Res<ButtonInput<KeyCode>>,
 ) {
-    println!("FPS: {}", (1./time.delta_secs()) as u32);
-    // if keys.just_pressed(KeyCode::KeyP) {
-    //     rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = true;
-    // }
+    if keys.just_pressed(KeyCode::KeyP) {
+        for mut robot_transform in robot_q.iter_mut() {
+            robot_transform.translation.x += 1.;
+        }
+    }
     // else {
     //     rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = false;
     // }

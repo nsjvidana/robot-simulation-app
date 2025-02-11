@@ -136,6 +136,11 @@ pub enum ResettedSnapshotState {
     Idle
 }
 
+pub struct RobotSimSnapshot {
+    pub rapier_context: Vec<u8>,
+    pub robots: Vec<u8>,
+}
+
 pub fn robot_sandbox_ui(
     mut ctxs: EguiContexts,
     mut ik_ui: Local<IKSandboxUI>,

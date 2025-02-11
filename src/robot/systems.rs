@@ -8,6 +8,8 @@ use bevy_rapier3d::rapier::data::Index;
 use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, RigidBodyAdditionalMassProps};
 use rapier3d_urdf::{UrdfJointHandle, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
+use std::ops::DerefMut;
+use bevy_rapier3d::utils::iso_to_transform;
 use crate::robot::*;
 
 macro_rules! rapier_collider_to_components {
@@ -168,6 +170,7 @@ pub fn init_robots(
             }
             let rb_ent = rb_ent.id();
             rb.user_data = rb_ent.to_bits() as u128;
+            let initial_rb_pos = iso_to_transform(rb.position());
             context.entity2body.insert(rb_ent, link.body);
 
             //spawning colliders
@@ -195,7 +198,8 @@ pub fn init_robots(
 
             robot_links.push(RobotLink {
                 rigid_body: rb_ent,
-                colliders: collider_entities
+                colliders: collider_entities,
+                initial_pos: initial_rb_pos,
             });
         }
 
@@ -255,12 +259,19 @@ pub fn init_robots(
 }
 
 pub fn sync_robot_changes(
-    mut changed_robot_transforms: Query<
+    mut changed_robot_transforms_q: Query<
         (&GlobalTransform, &RobotEntities),
         (With<Robot>, Changed<GlobalTransform>)
+    >,
+    mut rb_transform_q: Query<
+        &mut GlobalTransform,
+        (With<RigidBody>, With<RobotPart>,  Without<Robot>)
     >
 ) {
-    for (transform, robot_entities) in changed_robot_transforms.iter() {
-
+    for (transform, robot_entities) in changed_robot_transforms_q.iter() {
+        for RobotLink {rigid_body, initial_pos, ..} in robot_entities.link_entities.iter() {
+            let mut rb_transform = rb_transform_q.get_mut(*rigid_body).unwrap();
+            let _ = std::mem::replace(rb_transform.deref_mut(), transform.mul_transform(*initial_pos));
+        }
     }
 }
