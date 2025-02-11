@@ -1,5 +1,5 @@
 use crate::convert::IntoBevy;
-use bevy::prelude::{Changed, GlobalTransform, Mut};
+use bevy::prelude::{Changed, GlobalTransform, Mut, Res, ResMut};
 use bevy::ptr::UnsafeCellDeref;
 use bevy::{hierarchy::BuildChildren, prelude::{Commands, Component, Entity, Query, Transform, With, Without}};
 use bevy_rapier3d::geometry::SolverGroups;
@@ -80,9 +80,10 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
-    mut robot_q: Query<(Entity, &mut Robot, Option<&RapierContextEntityLink>), Without<RobotEntities>>,
+    mut robot_q: Query<(Entity, &mut Robot, Option<&RapierContextEntityLink>), Without<RobotHandle>>,
     default_context_q: Query<Entity, With<DefaultRapierContext>>,
     mut context_q: Query<&mut RapierContext>,
+    mut robot_set: ResMut<RobotSet>,
 ) {
     //TODO: parallelize this?
     for (robot_entity, mut robot, ctx_link) in robot_q.iter_mut() {
@@ -203,6 +204,7 @@ pub fn init_robots(
             });
         }
 
+        //Adding joint components
         for UrdfJointHandle {joint, link1, link2} in handles.joints.iter() {
             if joint.is_none() { continue; }
 
@@ -250,25 +252,28 @@ pub fn init_robots(
             }
         }
 
-        commands.entity(robot_entity)
-            .insert(RobotEntities {
+        let robot_idx = robot_set.robots.insert(RobotEntities {
             link_entities: robot_links,
-        })
+        });
+        commands.entity(robot_entity)
+            .insert(RobotHandle(robot_idx))
             .insert_if_new(Transform::default());
     }
 }
 
 pub fn sync_robot_changes(
     mut changed_robot_transforms_q: Query<
-        (&GlobalTransform, &RobotEntities),
+        (&GlobalTransform, &RobotHandle),
         (With<Robot>, Changed<GlobalTransform>)
     >,
     mut rb_transform_q: Query<
         &mut GlobalTransform,
         (With<RigidBody>, With<RobotPart>,  Without<Robot>)
-    >
+    >,
+    mut robot_set: ResMut<RobotSet>
 ) {
-    for (transform, robot_entities) in changed_robot_transforms_q.iter() {
+    for (transform, robot_handle) in changed_robot_transforms_q.iter() {
+        let robot_entities=  robot_set.robots.get(robot_handle.0).unwrap();
         for RobotLink {rigid_body, initial_pos, ..} in robot_entities.link_entities.iter() {
             let mut rb_transform = rb_transform_q.get_mut(*rigid_body).unwrap();
             let _ = std::mem::replace(rb_transform.deref_mut(), transform.mul_transform(*initial_pos));

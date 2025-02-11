@@ -5,7 +5,7 @@ use bevy::ecs::schedule::ScheduleLabel;
 use bevy::math::Vec3;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::Real;
-use crate::robot::{Robot, RobotPart};
+use crate::robot::{Robot, RobotSet, RobotPart};
 use bevy::prelude::{ButtonInput, Camera, Color, Commands, DetectChanges, Entity, Gizmos, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Time, Window, With, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
@@ -114,7 +114,7 @@ pub struct PhysicsSimUi {
     pub physics_enabled: bool,
     pub sim_step_pressed: bool,
     pub sim_resetted: bool,
-    pub resetted_snapshot: Option<Vec<u8>>,
+    pub resetted_snapshot: Option<RobotSimSnapshot>,
     pub resetted_snapshot_state: ResettedSnapshotState
 }
 
@@ -359,20 +359,24 @@ fn control_physics_sim(
         (&mut RapierConfiguration, &mut RapierContext),
         With<DefaultRapierContext>
     >,
-    mut physics_sim_ui_data: ResMut<PhysicsSimUi>
+    mut physics_sim_ui_data: ResMut<PhysicsSimUi>,
 ) {
     let (mut config, mut rapier_context) = rapier_config_q.single_mut();
 
+    //TODO: reset robot entity data
     match physics_sim_ui_data.resetted_snapshot_state {
         ResettedSnapshotState::LoadSnapshot => {
             physics_sim_ui_data.physics_enabled = false;
-            if let Some(serialized_ctx) = &physics_sim_ui_data.resetted_snapshot {
-                let resetted_ctx = bincode::deserialize::<RapierContext>(serialized_ctx).unwrap();
+            if let Some(snapshot) = &physics_sim_ui_data.resetted_snapshot {
+                let resetted_ctx = bincode::deserialize::<RapierContext>(&snapshot.rapier_context).unwrap();
                 let _ = std::mem::replace(rapier_context.deref_mut(), resetted_ctx);
             }
         },
         ResettedSnapshotState::SaveSnapshot => {
-            physics_sim_ui_data.resetted_snapshot = Some(bincode::serialize(&*rapier_context).unwrap());
+            physics_sim_ui_data.resetted_snapshot = Some(RobotSimSnapshot {
+                rapier_context: bincode::serialize(&*rapier_context).unwrap(),
+                robots: vec![]
+            });
         },
         ResettedSnapshotState::Idle => {}
     }

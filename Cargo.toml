@@ -9,6 +9,7 @@ bevy-inspector-egui = "0.28.1"
 bevy_egui = "0.31.1" #
 bevy_flycam = "0.15.0"
 bevy_rapier3d = { version = "0.28.0", features = ["serde-serialize"] }
+serde = "1.0.217"
 bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier"] }
 parking_lot = "0.12.3"
 rfd = "0.15.2"

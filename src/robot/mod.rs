@@ -1,7 +1,22 @@
-use bevy::prelude::{Component, Entity};
+use bevy::app::App;
+use bevy::prelude::{Component, Entity, Plugin, Resource, Transform};
+use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot};
 
 pub mod systems;
+
+pub struct RobotPlugin;
+
+impl Plugin for RobotPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<RobotSet>();
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct RobotSet {
+    pub robots: Arena<RobotEntities>,
+}
 
 #[derive(Component)]
 pub struct Robot {
@@ -39,10 +54,12 @@ impl Default for RobotJointType {
     }
 }
 
-#[derive(Component)]
 pub struct RobotEntities {
     link_entities: Vec<RobotLink>,
 }
+
+#[derive(Component)]
+pub struct RobotHandle(pub Index);
 
 #[derive(Component)]
 pub struct LinkEntity {
@@ -55,4 +72,5 @@ pub struct RobotPart(pub Entity);
 pub struct RobotLink {
     rigid_body: Entity,
     colliders: Vec<Entity>,
+    initial_pos: Transform,
 }

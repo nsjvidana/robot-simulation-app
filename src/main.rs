@@ -9,7 +9,7 @@ use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDe
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
 use math::Real;
-use crate::robot::Robot;
+use crate::robot::{Robot, RobotPlugin};
 use crate::robot::systems::sync_robot_changes;
 use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
 
@@ -37,6 +37,7 @@ fn main() {
         WorldInspectorPlugin::default(),
         // EguiPlugin,
         RobotLabUiPlugin::new(Update, FixedUpdate),
+        RobotPlugin,
         NoCameraPlayerPlugin,
     ));
 
