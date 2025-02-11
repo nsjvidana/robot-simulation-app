@@ -1,5 +1,5 @@
 use crate::convert::IntoBevy;
-use bevy::prelude::Mut;
+use bevy::prelude::{Changed, GlobalTransform, Mut};
 use bevy::ptr::UnsafeCellDeref;
 use bevy::{hierarchy::BuildChildren, prelude::{Commands, Component, Entity, Query, Transform, With, Without}};
 use bevy_rapier3d::geometry::SolverGroups;
@@ -20,8 +20,8 @@ macro_rules! rapier_collider_to_components {
                 MassProperties::from_rapier($coll.mass_properties())
             ),
             //ColliderPosition
-            Transform::from_translation($coll.position().translation.into())
-                .with_rotation($coll.position().rotation.into()),
+            Transform::from_translation($coll.position_wrt_parent().unwrap().translation.into())
+                .with_rotation($coll.position_wrt_parent().unwrap().rotation.into()),
             //ColliderMaterial
             Friction {
                 coefficient: $coll.friction(),
@@ -251,5 +251,16 @@ pub fn init_robots(
             link_entities: robot_links,
         })
             .insert_if_new(Transform::default());
+    }
+}
+
+pub fn sync_robot_changes(
+    mut changed_robot_transforms: Query<
+        (&GlobalTransform, &RobotEntities),
+        (With<Robot>, Changed<GlobalTransform>)
+    >
+) {
+    for (transform, robot_entities) in changed_robot_transforms.iter() {
+
     }
 }

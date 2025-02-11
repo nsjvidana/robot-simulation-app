@@ -5,8 +5,8 @@ pub mod systems;
 
 #[derive(Component)]
 pub struct Robot {
-    rapier_urdf_robot: Option<UrdfRobot>,
-    pub robot_joint_type: RobotJointType,
+    pub(crate) rapier_urdf_robot: Option<UrdfRobot>,
+    pub(crate) robot_joint_type: RobotJointType,
 }
 
 impl Robot {
