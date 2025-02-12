@@ -4,15 +4,18 @@ use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::math::Vec3;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
-use crate::math::Real;
+use crate::math::{project_onto_plane, ray_len_for_plane_intersect_local, Real};
 use crate::robot::{Robot, RobotSet, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Color, Commands, DetectChanges, Entity, Gizmos, GlobalTransform, IntoSystemConfigs, Local, MouseButton, Name, Plugin, Query, Res, ResMut, Resource, Single, Time, Window, With, Without};
+use bevy::prelude::{ButtonInput, Camera, Color, Commands, DetectChanges, Entity, Gizmos, GlobalTransform, InfinitePlane3d, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, Quat, Query, Ray3d, Res, ResMut, Resource, Single, Time, Transform, Vec2, Window, With, Without};
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
+use bevy_rapier3d::parry::query::RayCast;
 use bevy_rapier3d::plugin::TimestepMode;
 use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, ReadDefaultRapierContext};
+use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
+use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 
 pub struct RobotLabUiPlugin {
@@ -88,25 +91,24 @@ impl Default for RobotImportUI {
     }
 }
 
+#[derive(Default)]
 pub struct ToolbarUI {
     pub toolbar_state: ToolbarState,
     pub selected_robot: Option<Entity>,
     pub selected_entity: Option<Entity>,
-}
-
-impl Default for ToolbarUI {
-    fn default() -> Self {
-        Self {
-            selected_entity: None,
-            selected_robot: None,
-            toolbar_state: ToolbarState::Grab
-        }
-    }
+    pub selected_axis: Option<Vec3>,
+    pub init_clicked_pos: Option<Vec3>,
 }
 
 pub enum ToolbarState {
     Grab,
     Rotate,
+}
+
+impl Default for ToolbarState {
+    fn default() -> Self {
+        Self::Grab
+    }
 }
 
 #[derive(Resource)]
@@ -150,7 +152,6 @@ pub fn robot_sandbox_ui(
     mut commands: Commands,
     robot_part_q: Query<&RobotPart>,
     transform_q: Query<&GlobalTransform>,
-    name_q: Query<&Name>,
     camera: Single<(&Camera, &GlobalTransform)>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
@@ -182,61 +183,41 @@ pub fn robot_sandbox_ui(
         }
     );
 
+    let mut clicked_ray = None;
+    if !ctxs.ctx_mut().is_using_pointer() {
+        //get selected entity
+        if mouse_button_input.just_pressed(MouseButton::Left) {
+            let (camera, camera_transform) = *camera;
+            let ray = window
+                .cursor_position()
+                .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
+                .unwrap();
+            clicked_ray = Some(ray);
+            if let Some((rb_ent, _)) = rapier_context.cast_ray(
+                ray.origin,
+                ray.direction.as_vec3(),
+                1000.0,
+                true,
+                QueryFilter::default()
+            ) { toolbar_ui.selected_entity = Some(rb_ent); }
+            else { toolbar_ui.selected_entity = None; }
+        }
+    }
+
     //Toolbar window
-    let toolbar_window = egui::Window::new("Toolbar").show(
+    egui::Window::new("Toolbar").show(
         ctxs.ctx_mut(), |ui| {
             make_toolbar_ui(
                 ui,
                 &mut toolbar_ui,
-                rapier_context,
                 &robot_part_q,
-                &name_q,
-                &transform_q,
-                &camera,
-                &window,
-                &mouse_button_input,
                 &mut gizmos,
+                &transform_q,
+                &mouse_button_input,
+                clicked_ray.as_ref()
             );
         }
-    ).unwrap();
-
-    if !ctxs.ctx_mut().is_using_pointer() {
-        //capture selected entities
-        if mouse_button_input.just_pressed(MouseButton::Left) {
-            toolbar_ui.selected_entity = get_clicked_entity(
-                &*camera,
-                &window,
-                rapier_context,
-            );
-
-            //get selected robot if one was selected
-            if let Some(clicked_entity) = toolbar_ui.selected_entity {
-                if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
-                    toolbar_ui.selected_robot = Some(robot_entity);
-                }
-                else {
-                    toolbar_ui.selected_robot = None;
-                }
-            }
-            else {
-                toolbar_ui.selected_robot = None;
-            }
-        }
-    }
-
-    if let Some(robot_entity) = toolbar_ui.selected_robot {
-        //print robot name to console
-        if let Ok(name) = name_q.get(robot_entity) {
-            println!("{}", name);
-        }
-        //draw move gizmos
-        if let Ok(robot_transform) = transform_q.get(robot_entity) {
-            let robot_pos = robot_transform.translation();
-            gizmos.arrow(robot_pos, robot_pos + Vec3::X, Color::linear_rgba(1., 0., 0., 1.));
-            gizmos.arrow(robot_pos, robot_pos + Vec3::Y, Color::linear_rgba(0., 1., 0., 1.));
-            gizmos.arrow(robot_pos, robot_pos + Vec3::Z, Color::linear_rgba(1., 0., 1., 1.));
-        }
-    }
+    );
 
 }
 
@@ -399,42 +380,24 @@ fn control_physics_sim(
     }
 }
 
-// Gets the entity clicked in the current frame. Returns None if no entity was clicked.
-fn get_clicked_entity(
-    camera: &(&Camera, &GlobalTransform),
-    window: &Window,
-    rapier_context: &RapierContext
-) -> Option<Entity> {
-    let (camera, camera_transform) = *camera;
-    if let Some(pos) = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
-    {
-        if let Some((rb_ent, _)) = rapier_context.cast_ray(
-            pos.origin,
-            pos.direction.as_vec3(),
-            1000.0,
-            true,
-            QueryFilter::default()
-        ) {
-            return Some(rb_ent);
-        }
-    }
-    None
-}
-
 fn make_toolbar_ui(
     ui: &mut Ui,
     toolbar_ui: &mut ToolbarUI,
-    rapier_context: &RapierContext,
     robot_part_q: &Query<&RobotPart>,
-    name_q: &Query<&Name>,
-    transform_q: &Query<&GlobalTransform>,
-    camera: &(&Camera, &GlobalTransform),
-    window: &Window,
-    mouse_button_input: &ButtonInput<MouseButton>,
     gizmos: &mut Gizmos,
+    transform_q: &Query<&GlobalTransform>,
+    mouse_button_input: &ButtonInput<MouseButton>,
+    ray: Option<&Ray3d>,
 ) {
+    //get selected robot if one was selected
+    if let Some(clicked_entity) = toolbar_ui.selected_entity {
+        if let Ok(robot_entity) = robot_part_q.get(clicked_entity).map(|v| v.0) {
+            toolbar_ui.selected_robot = Some(robot_entity);
+        }
+        else { toolbar_ui.selected_robot = None; }
+    }
+    else { toolbar_ui.selected_robot = None; }
+
     ui.horizontal(|ui| {
         let mut grab = matches!(toolbar_ui.toolbar_state, ToolbarState::Grab);
         let grap_resp = ui.toggle_value(&mut grab, "Grab");
@@ -444,6 +407,104 @@ fn make_toolbar_ui(
         if grab && grap_resp.clicked() { toolbar_ui.toolbar_state = ToolbarState::Grab; }
         else if rotate && rotate_resp.clicked() { toolbar_ui.toolbar_state = ToolbarState::Rotate; }
     });
+
+    if let Some(robot_entity) = toolbar_ui.selected_robot {
+        //drawing toolbar gizmos (grab & rotate)
+        if let Ok(robot_transform) = transform_q.get(robot_entity) {
+            let robot_pos = robot_transform.translation();
+            match toolbar_ui.toolbar_state {
+                //draw grab gizmos
+                ToolbarState::Grab => { //for now, it only moves in global coords
+                    gizmos.arrow(robot_pos, robot_pos + Vec3::X, Color::linear_rgb(1., 0., 0.));
+                    gizmos.arrow(robot_pos, robot_pos + Vec3::Y, Color::linear_rgb(0., 1., 0.));
+                    gizmos.arrow(robot_pos, robot_pos + Vec3::Z, Color::linear_rgb(0., 0., 1.));
+
+                    gizmos.cuboid(
+                        Transform::from_scale(Vec3::new(1., 0.1, 0.1))
+                            .with_translation(robot_pos + Vec3::new(0., 0., 0.5))
+                            .with_rotation(Quat::from_axis_angle(Vec3::Y, std::f32::consts::FRAC_PI_2).normalize()),
+                        Color::linear_rgb(1., 0., 0.)
+                    );
+
+                    let mut plane_normal = None;
+                    if ray.is_some() && mouse_button_input.just_pressed(MouseButton::Left) {
+                        let ray = ray.unwrap();
+                        let robot_translation: Vector3<Real> = robot_pos.into();
+                        let ray = Ray {
+                            origin: ray.origin.into(),
+                            dir: ray.direction.as_vec3().into(),
+                        };
+                        let cuboid = Cuboid::new(Vector3::new(1., 0.1, 0.1));
+                        let mut iso = Isometry3 {
+                            translation: (robot_translation + Vector3::new(0.5f32, 0., 0.)).into(),
+                            rotation: UnitQuaternion::identity(),
+                        };
+                        let x_clicked = cuboid.intersects_ray(&iso, &ray, 1000.0);
+                        iso.translation = (robot_translation + Vector3::new(0., 0.5, 0.)).into();
+                        iso.rotation = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), std::f32::consts::FRAC_PI_2);
+                        let y_clicked = cuboid.intersects_ray(&iso, &ray, 1000.0);
+                        iso.translation = (robot_translation + Vector3::new(0., 0., 0.5)).into();
+                        iso.rotation = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), std::f32::consts::FRAC_PI_2);
+                        let z_clicked = cuboid.intersects_ray(&iso, &ray, 1000.0);
+
+                        if x_clicked { toolbar_ui.selected_axis = Some(Vec3::X); }
+                        else if y_clicked { toolbar_ui.selected_axis = Some(Vec3::Y); }
+                        else if z_clicked { toolbar_ui.selected_axis = Some(Vec3::Z); }
+                        else { toolbar_ui.selected_axis = None; toolbar_ui.init_clicked_pos = None; }
+
+                        plane_normal =
+                            if x_clicked || z_clicked { Some(Vector3::y_axis()) }
+                            else if y_clicked { Some(Vector3::x_axis()) }
+                            else { None };
+                        if let Some(plane_normal) = plane_normal {
+                            let normal: Vec3 = plane_normal.into();
+                            let rot = Transform::IDENTITY.looking_at(normal.into(), Vec3::Y).rotation;
+                            gizmos.rect(Isometry3d::from_rotation(rot), Vec2::new(2., 2.), Color::linear_rgb(1., 1., 0.));
+                            let ray_len = ray_len_for_plane_intersect_local(
+                                &plane_normal,
+                                &ray.origin.into(),
+                                &ray.dir
+                            );
+
+                            toolbar_ui.init_clicked_pos = Some((project_onto_plane(
+                                &ray.dir,
+                                &plane_normal
+                            ) + robot_translation).into());
+                        }
+                    }
+                    else if toolbar_ui.selected_axis.is_some() && mouse_button_input.pressed(MouseButton::Left) {
+
+                    }
+                    else {
+                        toolbar_ui.selected_axis = None;
+                        toolbar_ui.init_clicked_pos = None;
+                    }
+                    if let Some(pos) = toolbar_ui.init_clicked_pos {
+                        gizmos.sphere(Isometry3d::from_translation(pos), 0.1, Color::linear_rgb(1., 1., 1.));
+                    }
+                },
+                //draw rotate gizmos
+                ToolbarState::Rotate => { //for now, it only rotates locally
+                    let mut iso = robot_transform.to_isometry();
+                    let rot_x = iso.rotation * Vec3::X;
+                    let rot_y = iso.rotation * Vec3::Y;
+                    let rot_z = iso.rotation * Vec3::Z;
+
+                    iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -rot_z, y_axis: rot_y, z_axis: rot_x, });
+                    gizmos.circle(iso, 1., Color::linear_rgb(1., 0., 0.));
+                    iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -rot_x, y_axis: rot_z, z_axis: rot_y, });
+                    gizmos.circle(iso, 1., Color::linear_rgb(0., 1., 0.));
+                    iso.rotation = Quat::from_mat3(&Mat3 { x_axis: rot_x, y_axis: rot_y, z_axis: rot_z, });
+                    gizmos.circle(iso, 1., Color::linear_rgb(0., 0., 1.));
+
+                    // bevy_rapier3d::rapier::parry::shape::Ball::new().cast_ray()
+                    // bevy_rapier3d::rapier::parry::query::intersection_test()
+                }
+            }
+
+
+        }
+    }
 }
 
 pub fn edit_timestep_mode(

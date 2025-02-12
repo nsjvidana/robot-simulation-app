@@ -14,7 +14,7 @@ bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier"] }
 parking_lot = "0.12.3"
 rfd = "0.15.2"
 rapier3d-urdf = { version = "0.3.0", features = ["stl"] }
-nalgebra = "0.33.2"
+nalgebra = { version = "0.33.2", features = ["convert-glam029"] }
 bincode = "1.3.3"
 
 [dependencies.k]

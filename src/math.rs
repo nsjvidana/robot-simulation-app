@@ -35,3 +35,13 @@ pub fn rotation_between_vectors(a: &Vector3<Real>, b: &Vector3<Real>) -> UnitQua
     )};
     UnitQuaternion::new_normalize(q)
 }
+
+pub fn ray_len_for_plane_intersect_local(
+    normal: &UnitVector3<Real>,
+    ray_origin: &Vector3<Real>,
+    ray_dir: &Vector3<Real>,
+) -> Real {
+    let numerator = normal.dot(ray_origin);
+    let denom = normal.dot(ray_dir);
+    -numerator/denom
+}

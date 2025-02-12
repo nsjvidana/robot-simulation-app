@@ -1,9 +1,11 @@
 use std::collections::HashMap;
-use bevy::prelude::{Component, Entity, GlobalTransform};
+use bevy::prelude::{Component, Dir3, Entity, GlobalTransform};
 use bevy_rapier3d::geometry::ActiveHooks;
 use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, CollisionEvent, ContactForceEvent, Group};
 use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::prelude::{CCDSolver, ColliderHandle, ColliderSet, DefaultBroadPhase, EventHandler, ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointHandle, MultibodyJointSet, NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyHandle, RigidBodySet};
+use nalgebra::Vector3;
+use crate::math::Real;
 
 pub trait IntoBevy {
     type Target;
