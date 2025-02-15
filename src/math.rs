@@ -36,12 +36,18 @@ pub fn rotation_between_vectors(a: &Vector3<Real>, b: &Vector3<Real>) -> UnitQua
     UnitQuaternion::new_normalize(q)
 }
 
-pub fn ray_len_for_plane_intersect_local(
+/// Returns a value `a` such that `ray_origin + (ray_dir * a)` gives a value `interesction_point`
+///
+/// Note: `a` can be negative, in which case `intersection_point` will be behind the ray.
+pub fn ray_scale_for_plane_intersect_local(
     normal: &UnitVector3<Real>,
     ray_origin: &Vector3<Real>,
     ray_dir: &Vector3<Real>,
-) -> Real {
+) -> Option<Real> {
     let numerator = normal.dot(ray_origin);
     let denom = normal.dot(ray_dir);
-    -numerator/denom
+    if denom == 0. {
+        return None
+    }
+    Some(-numerator / denom)
 }
