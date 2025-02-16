@@ -65,8 +65,10 @@ impl Plugin for RobotLabUiPlugin {
 #[derive(Resource, Default)]
 pub struct SelectedEntities {
     /// The entities that were clicked this frame.
-    /// This has all the entities under the pointer when the user clicked.
-    pub clicked_entities: Option<Entity>,
+    ///
+    /// This has all the entities under the pointer when the user clicked
+    /// including those that are behind others.
+    pub clicked_entities: Vec<Entity>,
     pub selected_entities: Vec<Entity>,
     pub selected_robots: Vec<Entity>,
     pub active_robot: Option<Entity>,
@@ -117,6 +119,7 @@ pub fn robot_lab_ui(
             ui.separator();
         });
     });
+
 }
 
 pub fn update_scene_window_data(
@@ -131,10 +134,15 @@ pub fn update_scene_window_data(
 }
 
 pub fn update_clicked_entities(
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     rapier_context: ReadDefaultRapierContext,
     mut selected_entities: ResMut<SelectedEntities>,
     scene_window_data: Res<SceneWindowData>,
 ) {
+    selected_entities.clicked_entities.clear();
+    if !mouse_button_input.just_pressed(MouseButton::Left) {
+        return;
+    }
     if let Some(ray) = scene_window_data.viewport_to_world_ray {
         let mut intersections = Vec::new();
         rapier_context.intersections_with_ray(
@@ -153,6 +161,12 @@ pub fn update_clicked_entities(
             if let Some(ord) = a.partial_cmp(b) { ord }
             else { Ordering::Equal }
         });
+
+        let mut entities_behind_pointer: Vec<_> = intersections
+            .iter()
+            .map(|v| v.0)
+            .collect();
+        selected_entities.clicked_entities.append(&mut entities_behind_pointer);
     }
 }
 
