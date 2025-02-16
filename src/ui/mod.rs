@@ -1,4 +1,5 @@
 pub mod toolbar;
+mod import;
 
 use std::cmp::Ordering;
 use std::ops::DerefMut;
@@ -20,6 +21,7 @@ use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
 use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
+use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::toolbar::{toolbar_ui, Toolbar};
 
 pub struct RobotLabUiPlugin {
@@ -41,6 +43,7 @@ impl Plugin for RobotLabUiPlugin {
         app.init_resource::<PhysicsSimUi>()
             .init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
+            .init_resource::<RobotImporting>()
             .init_resource::<Toolbar>();
 
         app.add_systems(
@@ -69,24 +72,51 @@ pub struct SelectedEntities {
     pub active_robot: Option<Entity>,
 }
 
+macro_rules! finish_ui_section_vertical {
+    ($ui:expr, $label_name:expr) => {{
+        $ui.label("");
+        $ui.set_width($ui.min_size().x);
+        $ui.vertical(|ui|
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                ui.label($label_name);
+            })
+        );
+    }};
+}
+
 pub fn robot_lab_ui(
+    mut commands: Commands,
     mut ctxs: EguiContexts,
     mut selected_entities: ResMut<SelectedEntities>,
     mut toolbar: ResMut<Toolbar>,
     mut transform_q: Query<&mut GlobalTransform>,
+    mut robot_importing: ResMut<RobotImporting>,
     mut gizmos: Gizmos,
 ) {
-    egui::Window::new("Toolbar").show(
-        ctxs.ctx_mut(), |ui| {
-            toolbar_ui(
-                ui,
-                &mut toolbar,
-                &mut selected_entities,
-                &transform_q,
-                &mut gizmos
-            );
-        }
-    );
+    egui::TopBottomPanel::top("Toolbar").show(ctxs.ctx_mut(), |ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                import_ui(
+                    &mut commands,
+                    ui,
+                    &mut robot_importing,
+                );
+                finish_ui_section_vertical!(ui, "Import")
+            });
+            ui.separator();
+            ui.vertical(|ui| {
+                toolbar_ui(
+                    ui,
+                    &mut toolbar,
+                    &mut selected_entities,
+                    &transform_q,
+                    &mut gizmos,
+                );
+                finish_ui_section_vertical!(ui, "Move")
+            });
+            ui.separator();
+        });
+    });
 }
 
 pub fn update_scene_window_data(
