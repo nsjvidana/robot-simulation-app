@@ -1,17 +1,21 @@
 pub mod position_tools;
 mod import;
+mod simulation;
 
 use std::cmp::Ordering;
 use std::ops::DerefMut;
 use bevy::app::{App, Update};
+use bevy::asset::Handle;
 use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
+use bevy::ecs::system::SystemState;
+use bevy::image::Image;
 use bevy::math::Vec3;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::{project_onto_plane, ray_scale_for_plane_intersect_local, Real};
 use crate::robot::{Robot, RobotSet, RobotPart};
-use bevy::prelude::{ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, Gizmos, GlobalTransform, InfinitePlane3d, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, Quat, Query, Ray3d, Res, ResMut, Resource, Single, Time, Transform, Vec2, Window, With, Without};
-use bevy_egui::egui::{ComboBox, Ui};
+use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, Gizmos, GlobalTransform, InfinitePlane3d, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, PreStartup, Quat, Query, Ray3d, Res, ResMut, Resource, Single, Time, Transform, Vec2, Window, With, Without, World};
+use bevy_egui::egui::{Align, ComboBox, Label, Layout, TextureId, Ui, UiBuilder};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use bevy_rapier3d::parry::query::RayCast;
@@ -23,6 +27,7 @@ use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::position_tools::{position_tools_ui, PositionTools};
+use crate::ui::simulation::{simulation_ribbon_ui, PhysicsSimulation};
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -40,11 +45,13 @@ impl RobotLabUiPlugin {
 
 impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PhysicsSimUi>()
+        app
             .init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
+            .init_resource::<RobotLabUiAssets>()
             .init_resource::<RobotImporting>()
-            .init_resource::<PositionTools>();
+            .init_resource::<PositionTools>()
+            .init_resource::<PhysicsSimulation>();
 
         app.add_systems(
             self.schedule,
@@ -74,15 +81,37 @@ pub struct SelectedEntities {
     pub active_robot: Option<Entity>,
 }
 
+#[derive(Resource)]
+pub struct RobotLabUiAssets {
+    play_img_handle: Handle<Image>,
+    new_window_img_handle: Handle<Image>,
+    play_img: TextureId,
+    new_window_img: TextureId,
+}
+
+impl FromWorld for RobotLabUiAssets {
+    fn from_world(world: &mut World) -> Self {
+        let mut sys_state: SystemState<EguiContexts> = SystemState::new(world);
+
+        let asset_server = world.get_resource::<AssetServer>().unwrap();
+
+        let new_window_img_handle: Handle<Image> = asset_server.load("../../assets/new_window.png");
+        let play_img_handle: Handle<Image> = asset_server.load("../../assets/play.png");
+
+        let mut egui_ctxs = sys_state.get_mut(world);
+        Self {
+            play_img: egui_ctxs.add_image(new_window_img_handle.clone_weak()),
+            new_window_img: egui_ctxs.add_image(play_img_handle.clone_weak()),
+            play_img_handle,
+            new_window_img_handle,
+        }
+    }
+}
+
 macro_rules! finish_ui_section_vertical {
-    ($ui:expr, $label_name:expr) => {{
-        $ui.label("");
-        $ui.set_width($ui.min_size().x);
-        $ui.vertical(|ui|
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                ui.label($label_name);
-            })
-        );
+    ($rects:expr, $ui:expr, $label_name:expr) => {{
+        Label::new("").layout_in_ui($ui);
+        $rects.push(($ui.min_rect(), $label_name));
     }};
 }
 
@@ -93,10 +122,13 @@ pub fn robot_lab_ui(
     mut position_tools: ResMut<PositionTools>,
     mut transform_q: Query<&mut GlobalTransform>,
     mut robot_importing: ResMut<RobotImporting>,
+    mut physics_sim: ResMut<PhysicsSimulation>,
+    ui_assets: Res<RobotLabUiAssets>,
     mut gizmos: Gizmos,
 ) {
     // Ribbon
     egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| {
+        let mut rects = Vec::new();
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 import_ui(
@@ -104,9 +136,9 @@ pub fn robot_lab_ui(
                     ui,
                     &mut robot_importing,
                 );
-                finish_ui_section_vertical!(ui, "Import")
+                finish_ui_section_vertical!(rects, ui, "Import");
             });
-            ui.separator();
+            ui.add(egui::Separator::default().grow(50.));
             ui.vertical(|ui| {
                 position_tools_ui(
                     ui,
@@ -115,10 +147,31 @@ pub fn robot_lab_ui(
                     &transform_q,
                     &mut gizmos,
                 );
-                finish_ui_section_vertical!(ui, "Position")
+                finish_ui_section_vertical!(rects, ui, "Position");
             });
-            ui.separator();
+            ui.add(egui::Separator::default().grow(50.));
+            ui.vertical(|ui| {
+                simulation_ribbon_ui(
+                    ui,
+                    &mut physics_sim,
+                    &ui_assets
+                );
+                finish_ui_section_vertical!(rects, ui, "Simulate");
+            });
+            ui.add(egui::Separator::default().grow(50.));
         });
+
+        // Finish the ribbon by adding the names of each section
+        ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+            for (mut rect, section_name) in rects {
+                rect.max.y = ui.max_rect().max.y;
+                ui.allocate_new_ui(
+                    UiBuilder::new().max_rect(rect),
+                    |ui| ui.label(section_name)
+                );
+            }
+        });
+
     });
 }
 
