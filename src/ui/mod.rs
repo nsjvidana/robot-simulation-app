@@ -1,4 +1,4 @@
-pub mod toolbar;
+pub mod position_tools;
 mod import;
 
 use std::cmp::Ordering;
@@ -22,7 +22,7 @@ use k::{InverseKinematicsSolver, SerialChain};
 use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::ui::import::{import_ui, RobotImporting};
-use crate::ui::toolbar::{toolbar_ui, Toolbar};
+use crate::ui::position_tools::{position_tools_ui, PositionTools};
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -44,7 +44,7 @@ impl Plugin for RobotLabUiPlugin {
             .init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
             .init_resource::<RobotImporting>()
-            .init_resource::<Toolbar>();
+            .init_resource::<PositionTools>();
 
         app.add_systems(
             self.schedule,
@@ -90,12 +90,13 @@ pub fn robot_lab_ui(
     mut commands: Commands,
     mut ctxs: EguiContexts,
     mut selected_entities: ResMut<SelectedEntities>,
-    mut toolbar: ResMut<Toolbar>,
+    mut position_tools: ResMut<PositionTools>,
     mut transform_q: Query<&mut GlobalTransform>,
     mut robot_importing: ResMut<RobotImporting>,
     mut gizmos: Gizmos,
 ) {
-    egui::TopBottomPanel::top("Toolbar").show(ctxs.ctx_mut(), |ui| {
+    // Ribbon
+    egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 import_ui(
@@ -107,19 +108,18 @@ pub fn robot_lab_ui(
             });
             ui.separator();
             ui.vertical(|ui| {
-                toolbar_ui(
+                position_tools_ui(
                     ui,
-                    &mut toolbar,
+                    &mut position_tools,
                     &mut selected_entities,
                     &transform_q,
                     &mut gizmos,
                 );
-                finish_ui_section_vertical!(ui, "Move")
+                finish_ui_section_vertical!(ui, "Position")
             });
             ui.separator();
         });
     });
-
 }
 
 pub fn update_scene_window_data(

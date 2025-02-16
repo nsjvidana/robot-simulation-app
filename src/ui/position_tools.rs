@@ -7,15 +7,15 @@ use nalgebra::{UnitVector3, Vector3};
 use crate::math::Real;
 use crate::ui::SelectedEntities;
 
-/// Contains all the data needed for the toolbar UI
+/// Contains all the data needed for the Posiion section of the Ribbon
 #[derive(Default, Resource)]
-pub struct Toolbar {
-    pub selected_tool: Tool,
+pub struct PositionTools {
+    pub selected_tool: PositionTool,
     pub pointer_usage_state: PointerUsageState,
     pub local_coords: bool
 }
 
-pub enum Tool {
+pub enum PositionTool {
     Grab {
         grabbed_axis: Option<UnitVector3<Real>>,
         plane_normal: Option<UnitVector3<Real>>,
@@ -29,7 +29,7 @@ pub enum Tool {
     },
 }
 
-impl Default for Tool {
+impl Default for PositionTool {
     fn default() -> Self {
         Self::Grab {
             grabbed_axis: None,
@@ -40,7 +40,7 @@ impl Default for Tool {
     }
 }
 
-/// An enum that tells how the pointer using the toolbar
+/// An enum that tells how the pointer using the Positioning tools
 #[derive(Default)]
 pub enum PointerUsageState {
     #[default]
@@ -48,23 +48,23 @@ pub enum PointerUsageState {
     NotUsed
 }
 
-/// The function that draws the toolbar UI and any gizmos associated with the current tool
-pub fn toolbar_ui(
+/// The function that draws the Position UI and any gizmos associated with the current tool
+pub fn position_tools_ui(
     ui: &mut Ui,
-    toolbar: &mut Toolbar,
+    position_tools: &mut PositionTools,
     selected_entities: &mut SelectedEntities,
     transform_q: &Query<&mut GlobalTransform>,
     gizmos: &mut Gizmos
 ) {
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
-            let mut grab = matches!(toolbar.selected_tool, Tool::Grab { .. });
+            let mut grab = matches!(position_tools.selected_tool, PositionTool::Grab { .. });
             let grab_clicked = ui.toggle_value(&mut grab, "Grab").clicked();
-            let mut rotate = matches!(toolbar.selected_tool, Tool::Rotate { .. });
+            let mut rotate = matches!(position_tools.selected_tool, PositionTool::Rotate { .. });
             let rotate_clicked = ui.toggle_value(&mut rotate, "Rotate").clicked();
 
             if grab && grab_clicked {
-                toolbar.selected_tool = Tool::Grab {
+                position_tools.selected_tool = PositionTool::Grab {
                     grabbed_axis: None,
                     plane_normal: None,
                     init_pointer_pos: None,
@@ -72,7 +72,7 @@ pub fn toolbar_ui(
                 }
             }
             else if rotate && rotate_clicked {
-                toolbar.selected_tool = Tool::Rotate {
+                position_tools.selected_tool = PositionTool::Rotate {
                     grabbed_disc_normal: None,
                     init_pointer_pos: None,
                     curr_pointer_pos: None,
@@ -81,13 +81,13 @@ pub fn toolbar_ui(
         });
         ui.label("Coordinate Space");
         ui.horizontal(|ui| {
-            let mut global = !toolbar.local_coords;
+            let mut global = !position_tools.local_coords;
             let global_clicked = ui.toggle_value(&mut global, "Global").clicked();
-            let mut local = toolbar.local_coords;
+            let mut local = position_tools.local_coords;
             let local_clicked = ui.toggle_value(&mut local, "Local").clicked();
 
-            if global && global_clicked { toolbar.local_coords = false; }
-            else if local && local_clicked { toolbar.local_coords = true; }
+            if global && global_clicked { position_tools.local_coords = false; }
+            else if local && local_clicked { position_tools.local_coords = true; }
         })
     });
 
@@ -96,10 +96,10 @@ pub fn toolbar_ui(
         let robot_transform = transform_q.get(robot).unwrap();
         let pos = robot_transform.translation();
         let rot = robot_transform.rotation();
-        match toolbar.selected_tool {
-            Tool::Grab { .. } => {
+        match position_tools.selected_tool {
+            PositionTool::Grab { .. } => {
                 let (x_axis, y_axis, z_axis) =
-                    if toolbar.local_coords {
+                    if position_tools.local_coords {
                         (rot * Vec3::X, rot * Vec3::Y, rot * Vec3::Z)
                     }
                     else {
@@ -109,7 +109,7 @@ pub fn toolbar_ui(
                 gizmos.arrow(pos, pos + y_axis, Color::linear_rgb(0., 1., 0.));
                 gizmos.arrow(pos, pos + z_axis, Color::linear_rgb(0., 0., 1.));
             },
-            Tool::Rotate { .. } => {}
+            PositionTool::Rotate { .. } => {}
         }
     }
 }
