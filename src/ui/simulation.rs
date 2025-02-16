@@ -1,12 +1,12 @@
-use std::ops::DerefMut;
-use bevy::prelude::{Commands, Handle, Image, Query, ResMut, Resource, With};
-use bevy::utils::default;
-use bevy_egui::{egui, EguiContexts};
-use bevy_egui::egui::{Align, Button, Label, Layout, Ui, UiBuilder};
-use bevy_egui::egui::load::SizedTexture;
-use bevy_rapier3d::plugin::{DefaultRapierContext, RapierConfiguration, RapierContext};
 use crate::robot::RobotSet;
 use crate::ui::RobotLabUiAssets;
+use bevy::prelude::{Commands, Query, ResMut, Resource, With};
+use bevy::utils::default;
+use bevy_egui::egui::load::SizedTexture;
+use bevy_egui::egui::{Button, Ui};
+use bevy_egui::egui;
+use bevy_rapier3d::plugin::{DefaultRapierContext, RapierConfiguration, RapierContext};
+use std::ops::DerefMut;
 
 /// Contains the data needed for the physics simulation window
 #[derive(Resource)]

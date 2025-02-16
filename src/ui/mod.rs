@@ -2,19 +2,20 @@ pub mod position_tools;
 mod import;
 mod simulation;
 
-use std::cmp::Ordering;
-use std::ops::DerefMut;
-use bevy::app::{App, Update};
+use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
+use crate::math::{ray_scale_for_plane_intersect_local, Real};
+use crate::robot::{Robot, RobotPart, RobotSet};
+use crate::ui::import::{import_ui, RobotImporting};
+use crate::ui::position_tools::{position_tools_ui, PositionTools};
+use crate::ui::simulation::{control_simulation, simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
+use bevy::app::App;
 use bevy::asset::Handle;
 use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::SystemState;
 use bevy::image::Image;
 use bevy::math::Vec3;
-use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
-use crate::math::{project_onto_plane, ray_scale_for_plane_intersect_local, Real};
-use crate::robot::{Robot, RobotSet, RobotPart};
-use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, Gizmos, GlobalTransform, InfinitePlane3d, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, PreStartup, Quat, Query, Ray3d, Res, ResMut, Resource, Single, Time, Transform, Vec2, Window, With, Without, World};
+use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, Quat, Query, Ray3d, Res, ResMut, Resource, Single, Transform, Window, With, World};
 use bevy_egui::egui::{Align, ComboBox, Label, Layout, TextureId, Ui, UiBuilder};
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -23,11 +24,10 @@ use bevy_rapier3d::plugin::TimestepMode;
 use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, ReadDefaultRapierContext};
 use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
-use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
+use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use crate::ui::import::{import_ui, RobotImporting};
-use crate::ui::position_tools::{position_tools_ui, PositionTools};
-use crate::ui::simulation::{simulation_ribbon_ui, simulation_control_window, PhysicsSimulation, control_simulation};
+use std::cmp::Ordering;
+use std::ops::DerefMut;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
