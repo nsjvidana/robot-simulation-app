@@ -1,5 +1,6 @@
 pub mod toolbar;
 
+use std::cmp::Ordering;
 use std::ops::DerefMut;
 use bevy::app::{App, Update};
 use bevy::ecs::intern::Interned;
@@ -19,6 +20,7 @@ use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
 use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
+use crate::ui::toolbar::{toolbar_ui, Toolbar};
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -36,28 +38,92 @@ impl RobotLabUiPlugin {
 
 impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PhysicsSimUi>();
-        app.init_resource::<SceneWindowData>();
+        app.init_resource::<PhysicsSimUi>()
+            .init_resource::<SceneWindowData>()
+            .init_resource::<SelectedEntities>()
+            .init_resource::<Toolbar>();
 
-        app.add_systems(self.schedule,
+        app.add_systems(
+            self.schedule,
             (
                 update_scene_window_data,
-                robot_sandbox_ui.after(update_scene_window_data)
-            ))
-            .add_systems(self.physics_schedule, control_physics_sim
-                .before(PhysicsSet::StepSimulation)
-                .after(PhysicsSet::SyncBackend)
-            );
+                update_clicked_entities,
+                robot_lab_ui,
+                // robot_sandbox_ui
+            ).chain()
+        );
+        // .add_systems(self.physics_schedule, control_physics_sim
+        //     .before(PhysicsSet::StepSimulation)
+        //     .after(PhysicsSet::SyncBackend)
+        // );
     }
 }
 
 #[derive(Resource, Default)]
 pub struct SelectedEntities {
-    /// The entity that was clicked this frame
-    pub clicked_entity: Option<Entity>,
+    /// The entities that were clicked this frame.
+    /// This has all the entities under the pointer when the user clicked.
+    pub clicked_entities: Option<Entity>,
     pub selected_entities: Vec<Entity>,
     pub selected_robots: Vec<Entity>,
     pub active_robot: Option<Entity>,
+}
+
+pub fn robot_lab_ui(
+    mut ctxs: EguiContexts,
+    mut selected_entities: ResMut<SelectedEntities>,
+    mut toolbar: ResMut<Toolbar>,
+    mut transform_q: Query<&mut GlobalTransform>,
+    mut gizmos: Gizmos,
+) {
+    egui::Window::new("Toolbar").show(
+        ctxs.ctx_mut(), |ui| {
+            toolbar_ui(
+                ui,
+                &mut toolbar,
+                &mut selected_entities,
+                &transform_q,
+                &mut gizmos
+            );
+        }
+    );
+}
+
+pub fn update_scene_window_data(
+    camera: Single<(&Camera, &GlobalTransform)>,
+    mut scene_window_data: ResMut<SceneWindowData>,
+    window: Single<&Window>
+) {
+    let (camera, camera_transform) = *camera;
+    scene_window_data.viewport_to_world_ray = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok());
+}
+
+pub fn update_clicked_entities(
+    rapier_context: ReadDefaultRapierContext,
+    mut selected_entities: ResMut<SelectedEntities>,
+    scene_window_data: Res<SceneWindowData>,
+) {
+    if let Some(ray) = scene_window_data.viewport_to_world_ray {
+        let mut intersections = Vec::new();
+        rapier_context.intersections_with_ray(
+            ray.origin,
+            ray.direction.as_vec3(),
+            Real::MAX,
+            true,
+            QueryFilter::default(),
+            |ent, intersection| {
+                intersections.push((ent, intersection.time_of_impact));
+                true
+            }
+        );
+
+        intersections.sort_by(|(_, a), (_, b)| {
+            if let Some(ord) = a.partial_cmp(b) { ord }
+            else { Ordering::Equal }
+        });
+    }
 }
 
 pub struct IKSandboxUI {
@@ -179,17 +245,6 @@ pub struct RobotSimSnapshot {
 #[derive(Resource, Default)]
 pub struct SceneWindowData {
     viewport_to_world_ray: Option<Ray3d>
-}
-
-pub fn update_scene_window_data(
-    camera: Single<(&Camera, &GlobalTransform)>,
-    mut scene_window_data: ResMut<SceneWindowData>,
-    window: Single<&Window>
-) {
-    let (camera, camera_transform) = *camera;
-    scene_window_data.viewport_to_world_ray = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok());
 }
 
 pub fn robot_sandbox_ui(
