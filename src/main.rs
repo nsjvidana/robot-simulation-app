@@ -1,17 +1,17 @@
-use std::ops::DerefMut;
-use bevy::prelude::{ButtonInput, FixedPreUpdate, FixedUpdate, IntoSystemConfigs, KeyCode, PreStartup, Query, Res, ResMut, Startup, Update, With};
+use crate::robot::systems::sync_robot_changes;
+use crate::robot::{Robot, RobotPlugin};
+use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
+use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
 use bevy_rapier3d::plugin::PhysicsSet;
-use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteDefaultRapierContext};
+use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
 use math::Real;
-use crate::robot::{Robot, RobotPlugin};
-use crate::robot::systems::sync_robot_changes;
-use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
+use std::ops::DerefMut;
 
 mod kinematics;
 mod math;

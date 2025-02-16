@@ -1,3 +1,5 @@
+pub mod toolbar;
+
 use std::ops::DerefMut;
 use bevy::app::{App, Update};
 use bevy::ecs::intern::Interned;
@@ -47,6 +49,15 @@ impl Plugin for RobotLabUiPlugin {
                 .after(PhysicsSet::SyncBackend)
             );
     }
+}
+
+#[derive(Resource, Default)]
+pub struct SelectedEntities {
+    /// The entity that was clicked this frame
+    pub clicked_entity: Option<Entity>,
+    pub selected_entities: Vec<Entity>,
+    pub selected_robots: Vec<Entity>,
+    pub active_robot: Option<Entity>,
 }
 
 pub struct IKSandboxUI {
@@ -531,7 +542,6 @@ fn make_toolbar_ui(
                     if just_released && toolbar_ui.is_interacting_with_object && ray.is_some() {
                         if let Some(final_pos) = toolbar_ui.final_interaction_pos {
                             let init_pos = toolbar_ui.init_interaction_pos.unwrap();
-                            let final_pos = final_pos;
                             let moved_dist = (final_pos - init_pos).dot(&toolbar_ui.selected_axis.unwrap());
                             *robot_transform = robot_transform.mul_transform(
                                 Transform::from_translation(toolbar_ui.selected_axis.unwrap().scale(moved_dist).into())
