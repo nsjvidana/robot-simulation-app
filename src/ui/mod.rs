@@ -27,7 +27,7 @@ use nalgebra::{Isometry3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::position_tools::{position_tools_ui, PositionTools};
-use crate::ui::simulation::{simulation_ribbon_ui, PhysicsSimulation};
+use crate::ui::simulation::{simulation_ribbon_ui, simulation_control_window, PhysicsSimulation, control_simulation};
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -62,10 +62,10 @@ impl Plugin for RobotLabUiPlugin {
                 // robot_sandbox_ui
             ).chain()
         );
-        // .add_systems(self.physics_schedule, control_physics_sim
-        //     .before(PhysicsSet::StepSimulation)
-        //     .after(PhysicsSet::SyncBackend)
-        // );
+        app.add_systems(self.physics_schedule, control_simulation
+            .before(PhysicsSet::StepSimulation)
+            .after(PhysicsSet::SyncBackend)
+        );
     }
 }
 
@@ -173,6 +173,9 @@ pub fn robot_lab_ui(
         });
 
     });
+
+    //Physics sim window
+    simulation_control_window(ctxs.ctx_mut(), &mut physics_sim);
 }
 
 pub fn update_scene_window_data(
