@@ -1,7 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 use bevy::color::Color;
 use bevy::math::Vec3;
-use bevy::prelude::{Gizmos, GlobalTransform, Query, Resource, Transform};
+use bevy::prelude::{Gizmos, GlobalTransform, Isometry3d, Mat3, Quat, Query, Resource, Transform};
 use bevy::utils::default;
 use bevy_egui::egui::Ui;
 use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
@@ -142,7 +142,36 @@ pub fn position_tools_ui(
                 gizmos.arrow(orig, orig + y_axis, Color::linear_rgb(0., 1., 0.));
                 gizmos.arrow(orig, orig + z_axis, Color::linear_rgb(0., 0., 1.));
             },
-            PositionTool::Rotate { .. } => {}
+            PositionTool::Rotate { .. } => {
+                let [x_axis, y_axis, z_axis] = 
+                    if position_tools.local_coords {
+                        [robot_rot * Vec3::X, robot_rot * Vec3::Y, robot_rot * Vec3::Z]
+                    }
+                    else {
+                        [Vec3::X, Vec3::Y, Vec3::Z]
+                    };
+                position_tools.gizmos_axes = Some([
+                    UnitVector3::new_unchecked(x_axis.into()),
+                    UnitVector3::new_unchecked(y_axis.into()),
+                    UnitVector3::new_unchecked(z_axis.into())
+                ]);
+                let cam_to_robot = robot_pos - cam_pos;
+                let orig = cam_pos + (cam_to_robot.normalize() * 10.);
+                position_tools.gizmos_origin = Some(Isometry3 {
+                    translation: orig.into(),
+                    rotation: robot_rot.into(),
+                });
+                let mut iso = Isometry3d {
+                    translation: orig.into(),
+                    rotation: robot_rot,
+                };
+                iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -z_axis, y_axis        , z_axis: x_axis, });
+                gizmos.circle(iso, 1., Color::linear_rgb(1., 0., 0.));
+                iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -x_axis, y_axis: z_axis, z_axis: y_axis, });
+                gizmos.circle(iso, 1., Color::linear_rgb(0., 1., 0.));
+                iso.rotation = Quat::from_mat3(&Mat3 { x_axis         , y_axis        , z_axis        , });
+                gizmos.circle(iso, 1., Color::linear_rgb(0., 0., 1.));
+            }
         }
     }
     else {
@@ -260,7 +289,21 @@ pub fn position_tools_functionality(
                 // TODO: register Undo action
             }
         },
-        PositionTool::Rotate { .. } => bevy::log::warn_once!("The Rotate positioning tool isn't functional yet!")
+        PositionTool::Rotate {
+            ref mut grabbed_disc_normal,
+            ref mut init_pointer_pos,
+            ref mut curr_pointer_pos,
+        } => {
+            if selected_entities.viewport_clicked {
+
+            }
+            else if mouse_pressed {
+
+            }
+            else if mouse_just_released {
+
+            }
+        }
     }
 }
 
