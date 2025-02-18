@@ -73,7 +73,7 @@ pub fn position_tools_ui(
     position_tools: &mut PositionTools,
     selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
-    transform_q: &Query<&mut GlobalTransform>,
+    transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>
 ) {
     // Ribbon UI

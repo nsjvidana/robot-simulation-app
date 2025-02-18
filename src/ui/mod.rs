@@ -76,7 +76,8 @@ impl Plugin for RobotLabUiPlugin {
                 update_scene_window_data,
                 robot_lab_ui,
                 update_clicked_entities,
-                // robot_sandbox_ui
+                robot_lab_ui_functionality,
+                select_entities,
             ).chain()
         );
         app.add_systems(
@@ -174,12 +175,11 @@ pub fn robot_lab_ui(
     mut ctxs: EguiContexts,
     mut selected_entities: ResMut<SelectedEntities>,
     mut position_tools: ResMut<PositionTools>,
-    mut transform_q: Query<&mut GlobalTransform>,
     mut robot_importing: ResMut<RobotImporting>,
     mut physics_sim: ResMut<PhysicsSimulation>,
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    transform_q: Query<&GlobalTransform>,
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     // Ribbon
@@ -240,7 +240,15 @@ pub fn robot_lab_ui(
     else {
         selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
     }
+}
 
+pub fn robot_lab_ui_functionality(
+    mut selected_entities: ResMut<SelectedEntities>,
+    mut position_tools: ResMut<PositionTools>,
+    mut transform_q: Query<&mut GlobalTransform>,
+    scene_window_data: Res<SceneWindowData>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+) {
     position_tools_functionality(
         &mut position_tools,
         &scene_window_data,
@@ -268,7 +276,6 @@ pub fn update_clicked_entities(
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     rapier_context: ReadDefaultRapierContext,
     mut selected_entities: ResMut<SelectedEntities>,
-    robot_part_q: Query<&RobotPart>,
     scene_window_data: Res<SceneWindowData>,
 ) {
     selected_entities.clicked_entities.clear();
@@ -302,8 +309,15 @@ pub fn update_clicked_entities(
             .collect();
         selected_entities.clicked_entities.append(&mut entities_behind_pointer);
     }
+}
 
-    if matches!(selected_entities.pointer_usage_state, PointerUsageState::UsingTool) {
+pub fn select_entities(
+    mut selected_entities: ResMut<SelectedEntities>,
+    robot_part_q: Query<&RobotPart>,
+) {
+    if !selected_entities.viewport_clicked
+        || matches!(selected_entities.pointer_usage_state, PointerUsageState::UsingTool)
+    {
         return;
     }
     match selected_entities.selection_mode {
