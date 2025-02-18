@@ -141,14 +141,6 @@ pub fn position_tools_ui(
                 gizmos.arrow(orig, orig + x_axis, Color::linear_rgb(1., 0., 0.));
                 gizmos.arrow(orig, orig + y_axis, Color::linear_rgb(0., 1., 0.));
                 gizmos.arrow(orig, orig + z_axis, Color::linear_rgb(0., 0., 1.));
-
-                // DEBUG DRAW
-                if let (Some(init), Some(curr)) = (init_pointer_pos, curr_pointer_pos) {
-                    let init: Vec3 = init.into();
-                    let curr: Vec3 = curr.into();
-                    gizmos.sphere(init, 0.1, Color::linear_rgb(1., 1., 0.));
-                    gizmos.sphere(curr, 0.1, Color::linear_rgb(0., 1., 1.));
-                }
             },
             PositionTool::Rotate { .. } => {}
         }
@@ -241,9 +233,6 @@ pub fn position_tools_functionality(
                         );
                     }
                 }
-            }
-            // When mouse gets released
-            else if mouse_just_released {
                 if let (
                     Some(grabbed_axis),
                     Some(init_pos),
@@ -258,6 +247,9 @@ pub fn position_tools_functionality(
                         ));
                     }
                 }
+            }
+            // When mouse gets released
+            else if mouse_just_released {
                 // Reset the tool's data after moving the robot.
                 position_tools.init_robot_transform = None;
                 *grabbed_axis = None;
