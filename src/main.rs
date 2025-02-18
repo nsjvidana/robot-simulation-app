@@ -1,6 +1,6 @@
 use crate::robot::systems::sync_robot_changes;
 use crate::robot::{Robot, RobotPlugin};
-use crate::ui::{edit_timestep_mode, RobotLabUiPlugin};
+use crate::ui::RobotLabUiPlugin;
 use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
@@ -45,7 +45,6 @@ fn main() {
     app.add_systems(Update, update);
 
     app.add_systems(FixedUpdate, (
-        edit_timestep_mode.before(PhysicsSet::SyncBackend),
         sync_robot_changes.before(PhysicsSet::SyncBackend),
         robot::systems::init_robots
             .in_set(PhysicsSet::SyncBackend)

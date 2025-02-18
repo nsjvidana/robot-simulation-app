@@ -119,7 +119,7 @@ pub fn position_tools_ui(
         let robot_rot = robot_transform.rotation();
         let cam_pos = scene_window_data.camera_transform.translation();
         match position_tools.selected_tool {
-            PositionTool::Grab { init_pointer_pos, curr_pointer_pos,.. } => {
+            PositionTool::Grab { .. } => {
                 let [x_axis, y_axis, z_axis] =
                     if position_tools.local_coords {
                         [robot_rot * Vec3::X, robot_rot * Vec3::Y, robot_rot * Vec3::Z]
@@ -225,6 +225,7 @@ pub fn position_tools_functionality(
             // When mouse is held down
             else if mouse_pressed {
                 if let Some(normal) = plane_normal {
+                    selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     if let Some(robot_transform) = position_tools.init_robot_transform {
                         *curr_pointer_pos = compute_intersection_pos(
                             &ray,
@@ -238,7 +239,7 @@ pub fn position_tools_functionality(
                     Some(init_pos),
                     Some(curr_pos),
                     Some(init_transform)
-                ) = (&grabbed_axis, &init_pointer_pos, &curr_pointer_pos, &position_tools.init_robot_transform)
+                ) = (grabbed_axis, init_pointer_pos, curr_pointer_pos, position_tools.init_robot_transform)
                 {
                     if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
                         let disp = (*curr_pos - *init_pos).dot(grabbed_axis);
