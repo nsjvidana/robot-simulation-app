@@ -6,7 +6,7 @@ use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
 use crate::robot::{Robot, RobotPart, RobotSet};
 use crate::ui::import::{import_ui, RobotImporting};
-use crate::ui::position_tools::{position_tools_ui, PositionTools};
+use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
 use crate::ui::simulation::{control_simulation, simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
 use bevy::app::App;
 use bevy::gizmos::AppGizmoBuilder;
@@ -108,7 +108,7 @@ pub struct SelectedEntities {
 }
 
 /// An enum that tells how the pointer using the Positioning tools
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub enum PointerUsageState {
     UsingTool,
     UiUsingPointer,
@@ -173,6 +173,7 @@ pub fn robot_lab_ui(
     mut physics_sim: ResMut<PhysicsSimulation>,
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     // Ribbon
@@ -193,8 +194,8 @@ pub fn robot_lab_ui(
                     ui,
                     &mut position_tools,
                     &mut selected_entities,
-                    &transform_q,
                     &scene_window_data,
+                    &transform_q,
                     &mut gizmos,
                 );
                 finish_ui_section_vertical!(rects, ui, "Position");
@@ -233,6 +234,15 @@ pub fn robot_lab_ui(
     else {
         selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
     }
+
+    position_tools_functionality(
+        &mut position_tools,
+        &scene_window_data,
+        &mut selected_entities,
+        &mut transform_q,
+        mouse_button_input.just_released(MouseButton::Left),
+        mouse_button_input.pressed(MouseButton::Left),
+    );
 }
 
 pub fn update_scene_window_data(
@@ -257,7 +267,7 @@ pub fn update_clicked_entities(
 ) {
     selected_entities.clicked_entities.clear();
     selected_entities.viewport_clicked =
-        !egui_ctxs.ctx_mut().is_using_pointer() && mouse_button_input.just_pressed(MouseButton::Left);
+        !egui_ctxs.ctx_mut().is_pointer_over_area() && mouse_button_input.just_pressed(MouseButton::Left);
     if !selected_entities.viewport_clicked {
         return;
     }
