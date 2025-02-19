@@ -8,8 +8,8 @@ use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
 use bevy_rapier3d::parry::query::RayCast;
 use bevy_rapier3d::rapier::prelude::Ray;
 use bevy_rapier3d::utils::iso_to_transform;
-use nalgebra::{point, vector, Isometry3, Point3, Translation3, UnitQuaternion, UnitVector3, Vector3};
-use crate::math::{ray_scale_for_plane_intersect_local, Real};
+use nalgebra::{point, vector, ArrayStorage, Isometry3, Matrix3, Point3, Rotation3, Translation3, UnitQuaternion, UnitVector3, Vector3};
+use crate::math::{angle_to, ray_scale_for_plane_intersect_local, Real};
 use crate::ui::{EntitySelectionMode, PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
 
 /// Contains all the data needed for the Posiion section of the Ribbon
@@ -36,8 +36,8 @@ impl Default for PositionTools {
             init_robot_transform: None,
 
             grab_shape: Cuboid::new(Vector3::new(0.05, 0.6, 0.05)),
-            rotate_shape_outer: Cylinder::new(0.05, 1.),
-            rotate_shape_inner: Cylinder::new(0.05, 0.8),
+            rotate_shape_outer: Cylinder::new(0.05, 1.1),
+            rotate_shape_inner: Cylinder::new(0.05, 0.9),
         }
     }
 }
@@ -187,6 +187,7 @@ pub fn position_tools_functionality(
     transform_q: &mut Query<&mut GlobalTransform>,
     mouse_just_released: bool,
     mouse_pressed: bool,
+    gizmos: &mut Gizmos<UiGizmoGroup>
 ) {
     if
         scene_window_data.viewport_to_world_ray.is_none()
@@ -197,7 +198,7 @@ pub fn position_tools_functionality(
         return;
     }
     let ray = scene_window_data.viewport_to_world_ray.unwrap();
-    let orig_iso = position_tools.gizmos_origin.unwrap();
+    let gizmos_origin = position_tools.gizmos_origin.unwrap();
     let axes = position_tools.gizmos_axes.unwrap();
     let ray = Ray {
         origin: ray.origin.into(),
@@ -217,7 +218,7 @@ pub fn position_tools_functionality(
                 let shape = position_tools.grab_shape;
                 let mut clicked_axes = [false, false, false];
                 let pt = point![0., -0.6, 0.];
-                let mut init_iso = Isometry3::from(orig_iso.translation.vector + vector![0., 0.6, 0.]);
+                let mut init_iso = Isometry3::from(gizmos_origin.translation.vector + vector![0., 0.6, 0.]);
                 let iso = init_iso * Isometry3::rotation_wrt_point(
                     UnitQuaternion::from_axis_angle(&Vector3::z_axis(), -FRAC_PI_2),
                     pt
@@ -295,13 +296,68 @@ pub fn position_tools_functionality(
             ref mut curr_pointer_pos,
         } => {
             if selected_entities.viewport_clicked {
+                let [x_axis, y_axis, z_axis] = [
+                    axes[0].into_inner(),
+                    axes[1].into_inner(),
+                    axes[2].into_inner(),
+                ];
+                let mut clicked_axes = [false, false, false];
+                let mut iso = gizmos_origin;
+                let inner = position_tools.rotate_shape_inner;
+                let outer = position_tools.rotate_shape_outer;
+                iso.rotation = Rotation3::from_basis_unchecked(&[-y_axis, x_axis, z_axis]).into();
+                clicked_axes[0] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
+                iso.rotation = Rotation3::from_basis_unchecked(&[x_axis, y_axis, z_axis]).into();
+                clicked_axes[1] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
+                iso.rotation = Rotation3::from_basis_unchecked(&[x_axis, z_axis, -y_axis]).into();
+                clicked_axes[2] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
 
+                if let Some(idx) = clicked_axes.iter().position(|b| *b) {
+                    selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
+                    *grabbed_disc_normal = Some(axes[idx]);
+
+                    // Save robot transform
+                    position_tools.init_robot_transform = transform_q.get(robot).ok().copied();
+                    // Computing plane intersection point
+                    *init_pointer_pos = compute_intersection_pos(
+                        &ray,
+                        &position_tools.init_robot_transform.unwrap().translation().into(),
+                        &axes[idx],
+                    );
+                } else {
+                    *grabbed_disc_normal = None;
+                }
             }
             else if mouse_pressed {
-
+                if let Some(normal) = grabbed_disc_normal {
+                    selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
+                    if let Some(init_transform) = position_tools.init_robot_transform {
+                        *curr_pointer_pos = compute_intersection_pos(
+                            &ray,
+                            &init_transform.translation().into(),
+                            &normal,
+                        );
+                        if let (Some(init), Some(curr)) = (init_pointer_pos, curr_pointer_pos) {
+                            {
+                                let init: Vec3 = (*init).into();
+                                let curr: Vec3 = (*curr).into();
+                                gizmos.sphere(init, 0.1, Color::linear_rgb(1., 1. ,1.));
+                                gizmos.sphere(curr, 0.1, Color::linear_rgb(0., 1. ,1.));
+                            }
+                            if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
+                                *robot_transform = init_transform.mul_transform(Transform::from_rotation(
+                                    Quat::from_axis_angle((*normal).into(), angle_to(init, curr, normal)),
+                                ));
+                            }
+                        }
+                    }
+                }
             }
             else if mouse_just_released {
-
+                position_tools.init_robot_transform = None;
+                *grabbed_disc_normal = None;
+                *init_pointer_pos = None;
+                *curr_pointer_pos = None;
             }
         }
     }
