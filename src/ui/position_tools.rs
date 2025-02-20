@@ -9,7 +9,7 @@ use bevy_rapier3d::parry::query::RayCast;
 use bevy_rapier3d::rapier::prelude::Ray;
 use bevy_rapier3d::utils::iso_to_transform;
 use nalgebra::{point, vector, ArrayStorage, Isometry3, Matrix3, Point3, Rotation3, Translation3, UnitQuaternion, UnitVector3, Vector3};
-use crate::math::{angle_to, ray_scale_for_plane_intersect_local, Real};
+use crate::math::{angle_to, project_onto_plane, ray_scale_for_plane_intersect_local, Real};
 use crate::ui::{EntitySelectionMode, PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
 
 /// Contains all the data needed for the Posiion section of the Ribbon
@@ -35,7 +35,7 @@ impl Default for PositionTools {
             local_coords: default(),
             init_robot_transform: None,
 
-            grab_shape: Cuboid::new(Vector3::new(0.05, 0.6, 0.05)),
+            grab_shape: Cuboid::new(Vector3::new(0.05, 0.5, 0.05)),
             rotate_shape_outer: Cylinder::new(0.05, 1.1),
             rotate_shape_inner: Cylinder::new(0.05, 0.9),
         }
@@ -143,7 +143,7 @@ pub fn position_tools_ui(
                 gizmos.arrow(orig, orig + z_axis, Color::linear_rgb(0., 0., 1.));
             },
             PositionTool::Rotate { .. } => {
-                let [x_axis, y_axis, z_axis] = 
+                let [x_axis, y_axis, z_axis] =
                     if position_tools.local_coords {
                         [robot_rot * Vec3::X, robot_rot * Vec3::Y, robot_rot * Vec3::Z]
                     }
@@ -165,9 +165,9 @@ pub fn position_tools_ui(
                     translation: orig.into(),
                     rotation: robot_rot,
                 };
-                iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -z_axis, y_axis        , z_axis: x_axis, });
+                iso.rotation = Quat::from_mat3(&Mat3 { x_axis:  z_axis, y_axis        , z_axis: -x_axis, });
                 gizmos.circle(iso, 1., Color::linear_rgb(1., 0., 0.));
-                iso.rotation = Quat::from_mat3(&Mat3 { x_axis: -x_axis, y_axis: z_axis, z_axis: y_axis, });
+                iso.rotation = Quat::from_mat3(&Mat3 { x_axis         , y_axis: z_axis, z_axis: -y_axis, });
                 gizmos.circle(iso, 1., Color::linear_rgb(0., 1., 0.));
                 iso.rotation = Quat::from_mat3(&Mat3 { x_axis         , y_axis        , z_axis        , });
                 gizmos.circle(iso, 1., Color::linear_rgb(0., 0., 1.));
@@ -217,26 +217,25 @@ pub fn position_tools_functionality(
             if selected_entities.viewport_clicked {
                 let shape = position_tools.grab_shape;
                 let mut clicked_axes = [false, false, false];
-                let pt = point![0., -0.6, 0.];
-                let mut init_iso = Isometry3::from(gizmos_origin.translation.vector + vector![0., 0.6, 0.]);
-                let iso = init_iso * Isometry3::rotation_wrt_point(
-                    UnitQuaternion::from_axis_angle(&Vector3::z_axis(), -FRAC_PI_2),
-                    pt
-                );
+                let [x_axis, y_axis, z_axis] =
+                    [axes[0].into_inner(), axes[1].into_inner(), axes[2].into_inner()];
+                let mut iso = Isometry3 {
+                    translation: (gizmos_origin.translation.vector + x_axis * 0.5).into(),
+                    rotation: UnitQuaternion::from_basis_unchecked(&[-y_axis, x_axis, z_axis])
+                };
                 clicked_axes[0] = shape.intersects_ray(&iso, &ray, Real::MAX);
-                let iso = init_iso;
+                iso.translation = (gizmos_origin.translation.vector + y_axis * 0.5).into();
+                iso.rotation = UnitQuaternion::from_basis_unchecked(&[x_axis, y_axis, z_axis]);
                 clicked_axes[1] = shape.intersects_ray(&iso, &ray, Real::MAX);
-                let iso = init_iso * Isometry3::rotation_wrt_point(
-                    UnitQuaternion::from_axis_angle(&Vector3::x_axis(), FRAC_PI_2),
-                    pt
-                );
+                iso.translation = (gizmos_origin.translation.vector + z_axis * 0.5).into();
+                iso.rotation = UnitQuaternion::from_basis_unchecked(&[x_axis, z_axis, -y_axis]);
                 clicked_axes[2] = shape.intersects_ray(&iso, &ray, Real::MAX);
                 if let Some(idx) = clicked_axes.iter().position(|b| *b) {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     *grabbed_axis = Some(axes[idx]);
                     *plane_normal =
-                        if clicked_axes[0] { Some(Vector3::z_axis()) }
-                        else if clicked_axes[1] || clicked_axes[2] { Some(Vector3::x_axis()) }
+                        if idx == 0 { Some(axes[2]) }
+                        else if idx == 1 || idx == 2 { Some(axes[0]) }
                         else { unreachable!() };
 
                     // Save robot transform
@@ -315,6 +314,7 @@ pub fn position_tools_functionality(
                 if let Some(idx) = clicked_axes.iter().position(|b| *b) {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     *grabbed_disc_normal = Some(axes[idx]);
+                    println!("{:?}", axes[idx]);
 
                     // Save robot transform
                     position_tools.init_robot_transform = transform_q.get(robot).ok().copied();
@@ -338,16 +338,17 @@ pub fn position_tools_functionality(
                             &normal,
                         );
                         if let (Some(init), Some(curr)) = (init_pointer_pos, curr_pointer_pos) {
-                            {
-                                let init: Vec3 = (*init).into();
-                                let curr: Vec3 = (*curr).into();
-                                gizmos.sphere(init, 0.1, Color::linear_rgb(1., 1. ,1.));
-                                gizmos.sphere(curr, 0.1, Color::linear_rgb(0., 1. ,1.));
-                            }
                             if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
-                                *robot_transform = init_transform.mul_transform(Transform::from_rotation(
-                                    Quat::from_axis_angle((*normal).into(), angle_to(init, curr, normal)),
-                                ));
+                                let robot_translation = robot_transform.translation();
+                                let (init, curr): (Vec3, Vec3) = ((*init).into(), (*curr).into());
+                                let (init_loc, curr_loc) = ((init - robot_translation), (curr - robot_translation));
+                                let angle = init_loc.angle_between(curr_loc);
+                                let angle_dir = init_loc.cross(curr_loc).dot(normal.into_inner().into()).signum();
+                                *robot_transform = Transform {
+                                    translation: init_transform.translation(),
+                                    rotation: Quat::from_axis_angle((*normal).into(), angle * angle_dir) * init_transform.rotation(),
+                                    scale: Vec3::ONE
+                                }.into();
                             }
                         }
                     }
