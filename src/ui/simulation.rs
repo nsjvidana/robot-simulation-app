@@ -64,7 +64,7 @@ pub fn simulation_ribbon_ui(
     let btn = ui.add(
         Button::image(
             SizedTexture::new(ui_assets.new_window_img, [64.0, 64.0])
-        )
+        ).fill(egui::Color32::TRANSPARENT)
     );
     ui.label("Run Simulation");
     if btn.clicked() {

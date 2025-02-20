@@ -170,6 +170,13 @@ macro_rules! finish_ui_section_vertical {
     }};
 }
 
+#[macro_export]
+macro_rules! transparent_button {
+    ($txt:expr) => {
+        egui::Button::new($txt).fill(egui::Color32::TRANSPARENT)
+    };
+}
+
 pub fn robot_lab_ui(
     mut commands: Commands,
     mut ctxs: EguiContexts,

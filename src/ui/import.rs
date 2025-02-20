@@ -2,10 +2,12 @@ use std::fmt::Display;
 use bevy::core::Name;
 use bevy::prelude::{Commands, Resource};
 use bevy::utils::default;
+use bevy_egui::egui;
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::robot::Robot;
+use crate::transparent_button;
 
 #[derive(Resource)]
 pub struct RobotImporting {
@@ -51,7 +53,7 @@ pub fn import_ui(
     // Robot joint type
     ComboBox::from_label("Robot joint type")
         .selected_text(match importing.import_joint_type {
-            ImportJointType::Impulse => "Impulse", ImportJointType::Multibody => "Multibody", _ => unreachable!()
+            ImportJointType::Impulse => "Impulse", ImportJointType::Multibody => "Multibody"
         })
         .show_ui(ui, |ui| {
             ui.selectable_value(&mut importing.import_joint_type, ImportJointType::Impulse, "Impulse");
@@ -59,7 +61,7 @@ pub fn import_ui(
         });
 
     // Import urdf robot via file dialog
-    let button = ui.button("Import URDF");
+    let button = ui.add(transparent_button!("Import URDF"));
     if button.clicked() {
         let dialog = rfd::FileDialog::new()
             .add_filter("Robot Description", &["urdf", "URDF"])
