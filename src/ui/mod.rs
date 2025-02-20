@@ -203,6 +203,7 @@ pub fn robot_lab_ui(
                     &scene_window_data,
                     &transform_q,
                     &mut gizmos,
+                    &mut physics_sim
                 );
                 finish_ui_section_vertical!(rects, ui, "Position");
             });
@@ -248,7 +249,7 @@ pub fn robot_lab_ui_functionality(
     mut transform_q: Query<&mut GlobalTransform>,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
-    mut gizmos: Gizmos<UiGizmoGroup>
+    physics_sim: Res<PhysicsSimulation>
 ) {
     position_tools_functionality(
         &mut position_tools,
@@ -257,7 +258,7 @@ pub fn robot_lab_ui_functionality(
         &mut transform_q,
         mouse_button_input.just_released(MouseButton::Left),
         mouse_button_input.pressed(MouseButton::Left),
-        &mut gizmos
+        &physics_sim
     );
 }
 

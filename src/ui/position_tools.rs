@@ -11,6 +11,7 @@ use bevy_rapier3d::utils::iso_to_transform;
 use nalgebra::{point, vector, ArrayStorage, Isometry3, Matrix3, Point3, Rotation3, Translation3, UnitQuaternion, UnitVector3, Vector3};
 use crate::math::{angle_to, project_onto_plane, ray_scale_for_plane_intersect_local, Real};
 use crate::ui::{EntitySelectionMode, PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
+use crate::ui::simulation::PhysicsSimulation;
 
 /// Contains all the data needed for the Posiion section of the Ribbon
 #[derive(Resource)]
@@ -74,7 +75,8 @@ pub fn position_tools_ui(
     selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
     transform_q: &Query<&GlobalTransform>,
-    gizmos: &mut Gizmos<UiGizmoGroup>
+    gizmos: &mut Gizmos<UiGizmoGroup>,
+    physics_sim: &PhysicsSimulation,
 ) {
     // Ribbon UI
     ui.vertical(|ui| {
@@ -112,7 +114,12 @@ pub fn position_tools_ui(
         })
     });
 
+
     // Gizmos UI
+    // Don't draw gizmos when sim is active.
+    if physics_sim.physics_active {
+        return;
+    }
     if let Some(robot) = selected_entities.active_robot {
         let robot_transform = transform_q.get(robot).unwrap();
         let robot_pos = robot_transform.translation();
@@ -187,13 +194,14 @@ pub fn position_tools_functionality(
     transform_q: &mut Query<&mut GlobalTransform>,
     mouse_just_released: bool,
     mouse_pressed: bool,
-    gizmos: &mut Gizmos<UiGizmoGroup>
+    physics_sim: &PhysicsSimulation,
 ) {
     if
         scene_window_data.viewport_to_world_ray.is_none()
         || position_tools.gizmos_origin.is_none()
         || position_tools.gizmos_axes.is_none()
         || selected_entities.active_robot.is_none()
+        || physics_sim.physics_active
     {
         return;
     }
@@ -272,9 +280,12 @@ pub fn position_tools_functionality(
                 {
                     if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
                         let disp = (*curr_pos - *init_pos).dot(grabbed_axis);
-                        *robot_transform = init_transform.mul_transform(Transform::from_translation(
-                            (grabbed_axis.into_inner() * disp).into()
-                        ));
+                        let axis: Vec3 = grabbed_axis.into_inner().into();
+                        *robot_transform = Transform {
+                            translation: init_transform.translation() + axis * disp,
+                            rotation: init_transform.rotation(),
+                            scale: Vec3::ONE
+                        }.into();
                     }
                 }
             }
@@ -314,7 +325,6 @@ pub fn position_tools_functionality(
                 if let Some(idx) = clicked_axes.iter().position(|b| *b) {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     *grabbed_disc_normal = Some(axes[idx]);
-                    println!("{:?}", axes[idx]);
 
                     // Save robot transform
                     position_tools.init_robot_transform = transform_q.get(robot).ok().copied();
