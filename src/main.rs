@@ -84,7 +84,6 @@ pub fn startup(
                 .looking_at(Vec3::ZERO, Vec3::Y),
         Camera3d::default(),
         FlyCam,
-        Collider::ball(0.1)
     ));
 
     //ground
