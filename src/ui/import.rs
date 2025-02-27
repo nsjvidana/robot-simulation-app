@@ -61,7 +61,7 @@ pub fn import_ui(
         });
 
     // Import urdf robot via file dialog
-    let button = ui.add(transparent_button!("Import URDF"));
+    let button = ui.button("Import URDF");
     if button.clicked() {
         let dialog = rfd::FileDialog::new()
             .add_filter("Robot Description", &["urdf", "URDF"])

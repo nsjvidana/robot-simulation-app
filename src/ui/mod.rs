@@ -1,6 +1,7 @@
 pub mod position_tools;
 mod import;
 mod simulation;
+mod ribbon;
 
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
@@ -30,6 +31,7 @@ use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
 use bevy::gizmos::GizmoPlugin;
+use crate::ui::ribbon::Ribbon;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -60,6 +62,7 @@ impl Plugin for RobotLabUiPlugin {
             .init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
             .init_resource::<RobotLabUiAssets>()
+            .init_resource::<Ribbon>()
             .init_resource::<RobotImporting>()
             .init_resource::<PositionTools>()
             .init_resource::<PhysicsSimulation>();
@@ -74,9 +77,9 @@ impl Plugin for RobotLabUiPlugin {
             self.schedule,
             (
                 update_scene_window_data,
-                robot_lab_ui,
+                ribbon::ribbon_ui,
                 update_clicked_entities,
-                robot_lab_ui_functionality,
+                ribbon::ribbon_functionality,
                 select_entities,
             ).chain()
         );
@@ -163,110 +166,11 @@ impl FromWorld for RobotLabUiAssets {
     }
 }
 
-macro_rules! finish_ui_section_vertical {
-    ($rects:expr, $ui:expr, $label_name:expr) => {{
-        Label::new("").layout_in_ui($ui);
-        $rects.push(($ui.min_rect(), $label_name));
-    }};
-}
-
 #[macro_export]
 macro_rules! transparent_button {
     ($txt:expr) => {
         egui::Button::new($txt).fill(egui::Color32::TRANSPARENT)
     };
-}
-
-pub fn robot_lab_ui(
-    mut commands: Commands,
-    mut ctxs: EguiContexts,
-    mut selected_entities: ResMut<SelectedEntities>,
-    mut position_tools: ResMut<PositionTools>,
-    mut robot_importing: ResMut<RobotImporting>,
-    mut physics_sim: ResMut<PhysicsSimulation>,
-    ui_assets: Res<RobotLabUiAssets>,
-    scene_window_data: Res<SceneWindowData>,
-    transform_q: Query<&GlobalTransform>,
-    mut gizmos: Gizmos<UiGizmoGroup>,
-) {
-    // Ribbon
-    egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| {
-        let mut rects = Vec::new();
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                import_ui(
-                    &mut commands,
-                    ui,
-                    &mut robot_importing,
-                );
-                finish_ui_section_vertical!(rects, ui, "Import");
-            });
-            ui.add(egui::Separator::default().grow(50.));
-            ui.vertical(|ui| {
-                position_tools_ui(
-                    ui,
-                    &mut position_tools,
-                    &mut selected_entities,
-                    &scene_window_data,
-                    &transform_q,
-                    &mut gizmos,
-                    &mut physics_sim
-                );
-                finish_ui_section_vertical!(rects, ui, "Position");
-            });
-            ui.add(egui::Separator::default().grow(50.));
-            ui.vertical(|ui| {
-                simulation_ribbon_ui(
-                    ui,
-                    &mut physics_sim,
-                    &ui_assets
-                );
-                finish_ui_section_vertical!(rects, ui, "Simulate");
-            });
-            ui.add(egui::Separator::default().grow(50.));
-        });
-
-        // Finish the ribbon by adding the names of each section
-        ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
-            for (mut rect, section_name) in rects {
-                rect.max.y = ui.max_rect().max.y;
-                ui.allocate_new_ui(
-                    UiBuilder::new().max_rect(rect),
-                    |ui| ui.label(section_name)
-                );
-            }
-        });
-
-    });
-
-    //Physics sim window
-    simulation_control_window(ctxs.ctx_mut(), &mut physics_sim);
-
-    if ctxs.ctx_mut().is_using_pointer() {
-        selected_entities.pointer_usage_state = PointerUsageState::UiUsingPointer;
-    }
-    else {
-        selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
-    }
-}
-
-pub fn robot_lab_ui_functionality(
-    mut selected_entities: ResMut<SelectedEntities>,
-    mut position_tools: ResMut<PositionTools>,
-    mut transform_q: Query<&mut GlobalTransform>,
-    scene_window_data: Res<SceneWindowData>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
-    physics_sim: Res<PhysicsSimulation>
-) {
-    position_tools_functionality(
-        &mut position_tools,
-        &scene_window_data,
-        &mut selected_entities,
-        &mut transform_q,
-        mouse_button_input.just_released(MouseButton::Left),
-        mouse_button_input.pressed(MouseButton::Left),
-        &physics_sim
-    );
 }
 
 pub fn update_scene_window_data(
