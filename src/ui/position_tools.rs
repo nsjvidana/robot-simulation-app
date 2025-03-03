@@ -1,17 +1,17 @@
-use std::f32::consts::FRAC_PI_2;
+use crate::finish_ui_section_vertical;
+use crate::math::{ray_scale_for_plane_intersect_local, Real};
+use crate::ui::simulation::PhysicsSimulation;
+use crate::ui::{PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
 use bevy::color::Color;
 use bevy::math::Vec3;
 use bevy::prelude::{Gizmos, GlobalTransform, Isometry3d, Mat3, Quat, Query, Resource, Transform};
 use bevy::utils::default;
+use bevy_egui::egui;
 use bevy_egui::egui::Ui;
-use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
 use bevy_rapier3d::parry::query::RayCast;
+use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
 use bevy_rapier3d::rapier::prelude::Ray;
-use bevy_rapier3d::utils::iso_to_transform;
-use nalgebra::{point, vector, ArrayStorage, Isometry3, Matrix3, Point3, Rotation3, Translation3, UnitQuaternion, UnitVector3, Vector3};
-use crate::math::{angle_to, project_onto_plane, ray_scale_for_plane_intersect_local, Real};
-use crate::ui::{EntitySelectionMode, PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
-use crate::ui::simulation::PhysicsSimulation;
+use nalgebra::{Isometry3, Rotation3, UnitQuaternion, UnitVector3, Vector3};
 
 /// Contains all the data needed for the Posiion section of the Ribbon
 #[derive(Resource)]
@@ -77,9 +77,9 @@ pub fn position_tools_ui(
     transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>,
     physics_sim: &PhysicsSimulation,
-) {
+) -> (egui::Rect, &'static str) {
     // Ribbon UI
-    ui.vertical(|ui| {
+    let resp = ui.vertical(|ui| {
         ui.horizontal(|ui| {
             let mut grab = matches!(position_tools.selected_tool, PositionTool::Grab { .. });
             let grab_clicked = ui.toggle_value(&mut grab, "Grab").clicked();
@@ -111,14 +111,15 @@ pub fn position_tools_ui(
 
             if global && global_clicked { position_tools.local_coords = false; }
             else if local && local_clicked { position_tools.local_coords = true; }
-        })
+        });
+        finish_ui_section_vertical!(ui, "Position")
     });
 
 
     // Gizmos UI
     // Don't draw gizmos when sim is active.
     if physics_sim.physics_active {
-        return;
+        return resp.inner;
     }
     if let Some(robot) = selected_entities.active_robot {
         let robot_transform = transform_q.get(robot).unwrap();
@@ -185,6 +186,8 @@ pub fn position_tools_ui(
         position_tools.gizmos_origin = None;
         position_tools.gizmos_axes = None;
     }
+
+    resp.inner
 }
 
 pub fn position_tools_functionality(

@@ -7,6 +7,7 @@ use bevy_egui::egui::{Button, Ui};
 use bevy_egui::egui;
 use bevy_rapier3d::plugin::{DefaultRapierContext, RapierConfiguration, RapierContext};
 use std::ops::DerefMut;
+use crate::finish_ui_section_vertical;
 
 /// Contains the data needed for the physics simulation window
 #[derive(Resource)]
@@ -60,16 +61,20 @@ pub fn simulation_ribbon_ui(
     ui: &mut Ui,
     physics_sim: &mut PhysicsSimulation,
     ui_assets: &RobotLabUiAssets
-) {
-    let btn = ui.add(
-        Button::image(
-            SizedTexture::new(ui_assets.new_window_img, [64.0, 64.0])
-        ).fill(egui::Color32::TRANSPARENT)
-    );
-    ui.label("Run Simulation");
-    if btn.clicked() {
-        physics_sim.control_window_open = true;
-    }
+) -> (egui::Rect, &'static str) {
+    let resp = ui.vertical(|ui| {
+        let btn = ui.add(
+            Button::image(
+                SizedTexture::new(ui_assets.new_window_img, [64.0, 64.0])
+            ).fill(egui::Color32::TRANSPARENT)
+        );
+        ui.label("Run Simulation");
+        if btn.clicked() {
+            physics_sim.control_window_open = true;
+        }
+        finish_ui_section_vertical!(ui, "Simulation")
+    });
+    resp.inner
 }
 
 pub fn simulation_control_window(

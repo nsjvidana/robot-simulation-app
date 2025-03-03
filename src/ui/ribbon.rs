@@ -1,7 +1,7 @@
 use std::ops::Mul;
 use bevy::prelude::{Commands, Gizmos, GlobalTransform, MouseButton, Query, Res, ResMut, Resource};
 use bevy_egui::EguiContexts;
-use bevy_egui::egui::{Align, Color32, Layout, Rgba, UiBuilder};
+use bevy_egui::egui::{Align, Color32, Layout, Rgba, Ui, UiBuilder};
 use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
 use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup};
@@ -23,11 +23,12 @@ pub enum RibbonTab {
     //maybe Electromagnetics?
 }
 
+#[macro_export]
 macro_rules! finish_ui_section_vertical {
-    ($rects:expr, $ui:expr, $label_name:expr) => {{
+    ($ui:expr, $label_name:expr) => {{
         egui::Label::new("").layout_in_ui($ui);
-        $rects.push(($ui.min_rect(), $label_name));
-    }};
+        ($ui.min_rect(), $label_name)
+    }}
 }
 
 pub fn ribbon_ui(
@@ -66,51 +67,18 @@ pub fn ribbon_ui(
         });
         match ribbon.tab {
             RibbonTab::General => {
-                let mut rects = Vec::new();
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        import_ui(
-                            &mut commands,
-                            ui,
-                            &mut robot_importing,
-                        );
-                        finish_ui_section_vertical!(rects, ui, "Import");
-                    });
-                    ui.add(egui::Separator::default().grow(50.));
-                    ui.vertical(|ui| {
-                        position_tools_ui(
-                            ui,
-                            &mut position_tools,
-                            &mut selected_entities,
-                            &scene_window_data,
-                            &transform_q,
-                            &mut gizmos,
-                            &mut physics_sim
-                        );
-                        finish_ui_section_vertical!(rects, ui, "Position");
-                    });
-                    ui.add(egui::Separator::default().grow(50.));
-                    ui.vertical(|ui| {
-                        simulation_ribbon_ui(
-                            ui,
-                            &mut physics_sim,
-                            &ui_assets
-                        );
-                        finish_ui_section_vertical!(rects, ui, "Simulate");
-                    });
-                    ui.add(egui::Separator::default().grow(50.));
-                });
-
-                // Finish the ribbon by adding the names of each section
-                ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
-                    for (mut rect, section_name) in rects {
-                        rect.max.y = ui.max_rect().max.y;
-                        ui.allocate_new_ui(
-                            UiBuilder::new().max_rect(rect),
-                            |ui| ui.label(section_name)
-                        );
-                    }
-                });
+                general_tab(
+                    ui,
+                    &mut commands,
+                    &mut robot_importing,
+                    &mut position_tools,
+                    &mut selected_entities,
+                    &scene_window_data,
+                    &transform_q,
+                    &mut gizmos,
+                    &mut physics_sim,
+                    &ui_assets,
+                );
             },
             _ => {}
         }
@@ -125,6 +93,62 @@ pub fn ribbon_ui(
     else {
         selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
     }
+}
+
+fn general_tab(
+    ui: &mut Ui,
+    commands: &mut Commands,
+    robot_importing: &mut RobotImporting,
+    position_tools: &mut PositionTools,
+    selected_entities: &mut SelectedEntities,
+    scene_window_data: &SceneWindowData,
+    transform_q: &Query<&GlobalTransform>,
+    gizmos: &mut Gizmos<UiGizmoGroup>,
+    physics_sim: &mut PhysicsSimulation,
+    ui_assets: &RobotLabUiAssets,
+) {
+    let mut rects = Vec::new();
+    ui.horizontal(|ui| {
+        rects.push(
+            import_ui(
+                commands,
+                ui,
+                robot_importing,
+            )
+        );
+        ui.add(egui::Separator::default().grow(50.));
+        rects.push(
+            position_tools_ui(
+                ui,
+                position_tools,
+                selected_entities,
+                scene_window_data,
+                transform_q,
+                gizmos,
+                physics_sim
+            )
+        );
+        ui.add(egui::Separator::default().grow(50.));
+        rects.push(
+            simulation_ribbon_ui(
+                ui,
+                physics_sim,
+                &ui_assets
+            )
+        );
+        ui.add(egui::Separator::default().grow(50.));
+    });
+
+    // Finish the ribbon by adding the names of each section
+    ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+        for (mut rect, section_name) in rects {
+            rect.max.y = ui.max_rect().max.y;
+            ui.allocate_new_ui(
+                UiBuilder::new().max_rect(rect),
+                |ui| ui.label(section_name)
+            );
+        }
+    });
 }
 
 pub fn ribbon_functionality(
