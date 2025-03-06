@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use bevy::app::App;
 use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
 use bevy_rapier3d::rapier::data::{Arena, Index};
@@ -31,13 +32,15 @@ pub struct RobotSerData {
 pub struct Robot {
     pub(crate) rapier_urdf_robot: Option<UrdfRobot>,
     pub(crate) robot_joint_type: RobotJointType,
+    pub(crate) robot_file_path: PathBuf,
 }
 
 impl Robot {
-    pub fn new(robot: UrdfRobot) -> Self {
+    pub fn new(robot: UrdfRobot, path: PathBuf) -> Self {
         Self {
             rapier_urdf_robot: Some(robot),
             robot_joint_type: RobotJointType::ImpulseJoints,
+            robot_file_path: path,
         }
     }
 

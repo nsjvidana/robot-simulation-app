@@ -24,11 +24,11 @@ git = "https://github.com/nsjvidana/k.git"
 rev = "978e01f"
 version = "0.32.0"
 
-[profile.dev.package.bevy]
-opt-level = 3
+[profile.dev.package."*"]
+opt-level = 2
 
 [patch.crates-io]
-assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "2d4aadc" }
+assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "6ea264f" }
 
 #[profile.dev]
 #opt-level = 1

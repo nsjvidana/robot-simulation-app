@@ -2,13 +2,11 @@ pub mod position_tools;
 mod import;
 mod simulation;
 mod ribbon;
+mod motion_planning;
 
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
 use crate::robot::{Robot, RobotPart, RobotSet};
-use crate::ui::import::{import_ui, RobotImporting};
-use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
-use crate::ui::simulation::{control_simulation, simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
 use bevy::app::App;
 use bevy::gizmos::AppGizmoBuilder;
 use bevy::asset::Handle;
@@ -31,7 +29,6 @@ use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
 use bevy::gizmos::GizmoPlugin;
-use crate::ui::ribbon::Ribbon;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -62,10 +59,12 @@ impl Plugin for RobotLabUiPlugin {
             .init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
             .init_resource::<RobotLabUiAssets>()
-            .init_resource::<Ribbon>()
-            .init_resource::<RobotImporting>()
-            .init_resource::<PositionTools>()
-            .init_resource::<PhysicsSimulation>();
+            .init_resource::<ribbon::Ribbon>()
+            .init_resource::<import::RobotImporting>()
+            .init_resource::<position_tools::PositionTools>()
+            .init_resource::<simulation::PhysicsSimulation>();
+
+        app.init_non_send_resource::<motion_planning::MotionPlanning>();
 
         // Make all UI gizmos draw on top of everything
         app.init_gizmo_group::<UiGizmoGroup>();
@@ -85,7 +84,7 @@ impl Plugin for RobotLabUiPlugin {
         );
         app.add_systems(
             self.physics_schedule,
-            control_simulation
+            simulation::control_simulation
                 .before(PhysicsSet::StepSimulation)
                 .after(PhysicsSet::SyncBackend)
         );
@@ -146,7 +145,6 @@ pub struct RobotLabUiAssets {
     play_img: TextureId,
     new_window_img: TextureId,
 }
-
 impl FromWorld for RobotLabUiAssets {
     fn from_world(world: &mut World) -> Self {
         let mut sys_state: SystemState<EguiContexts> = SystemState::new(world);

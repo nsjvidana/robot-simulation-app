@@ -7,7 +7,8 @@ use bevy_egui::egui::{ComboBox, Ui};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::robot::Robot;
-use crate::{finish_ui_section_vertical, transparent_button};
+use crate::transparent_button;
+use crate::ui::ribbon::finish_ui_section_vertical;
 
 #[derive(Resource)]
 pub struct RobotImporting {
