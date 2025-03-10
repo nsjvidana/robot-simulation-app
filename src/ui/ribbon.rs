@@ -45,6 +45,7 @@ pub fn ribbon_ui(
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
+    robot_part_q: Query<&RobotPart>,
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     // Ribbon
@@ -90,6 +91,7 @@ pub fn ribbon_ui(
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
                     ui,
+                    &selected_entities,
                     &mut motion_planning,
                     ribbon_height
                 );
@@ -133,6 +135,7 @@ macro_rules! finish_ribbon_tab {
 }
 
 pub(crate) use finish_ribbon_tab;
+use crate::robot::RobotPart;
 
 fn general_tab(
     ui: &mut Ui,

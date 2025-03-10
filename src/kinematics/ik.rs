@@ -1,5 +1,11 @@
+use bevy::prelude::Component;
 use crate::math::{angle_to, project_onto_plane, Real};
 use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JointType, SerialChain, Vector3};
+
+#[derive(Component)]
+pub struct KinematicNode {
+    pub node: k::Node<Real>
+}
 
 macro_rules! cyclic_impl {
     ($struct_name:ident) => {

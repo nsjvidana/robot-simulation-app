@@ -4615,6 +4615,8 @@ dependencies = [
  "rapier3d-urdf",
  "rfd",
  "serde",
+ "urdf-rs 0.6.9",
+ "xurdf",
 ]
 
 [[package]]

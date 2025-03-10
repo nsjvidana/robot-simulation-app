@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use bevy::app::App;
 use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot};
 use serde::{Deserialize, Serialize};
+use crate::convert::urdf_rs_robot_to_xurdf;
 
 pub mod systems;
 
@@ -30,15 +31,17 @@ pub struct RobotSerData {
 
 #[derive(Component)]
 pub struct Robot {
-    pub(crate) rapier_urdf_robot: Option<UrdfRobot>,
-    pub(crate) robot_joint_type: RobotJointType,
-    pub(crate) robot_file_path: PathBuf,
+    urdf: urdf_rs::Robot,
+    mesh_dir: Option<PathBuf>,
+    pub robot_joint_type: RobotJointType,
+    pub robot_file_path: PathBuf,
 }
 
 impl Robot {
-    pub fn new(robot: UrdfRobot, path: PathBuf) -> Self {
+    pub fn new(robot: urdf_rs::Robot, path: PathBuf, mesh_dir: Option<PathBuf>) -> Self {
         Self {
-            rapier_urdf_robot: Some(robot),
+            urdf: robot,
+            mesh_dir,
             robot_joint_type: RobotJointType::ImpulseJoints,
             robot_file_path: path,
         }

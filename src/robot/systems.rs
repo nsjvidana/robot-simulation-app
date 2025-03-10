@@ -11,6 +11,7 @@ use std::cell::UnsafeCell;
 use std::ops::DerefMut;
 use bevy_rapier3d::utils::iso_to_transform;
 use crate::robot::*;
+use crate::ui::import::RobotImporting;
 
 macro_rules! rapier_collider_to_components {
     ($coll:expr, $coll_handle:expr, $context_link:expr) => {
@@ -80,6 +81,7 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
+    importing: Res<RobotImporting>,
     mut robot_q: Query<
         (Entity, &mut Robot, Option<&RapierContextEntityLink>, Option<&GlobalTransform>),
         Without<RobotHandle>
@@ -103,9 +105,17 @@ pub fn init_robots(
         // SAFETY: since the rapier context is accessed mutably, bevy restricts any other threads from
         //         accessing the context, so this should be safe
         let handles: UrdfRobotHandles<Option<Index>> = unsafe {
+            let urdf_robot = UrdfRobot::from_robot(
+                &urdf_rs_robot_to_xurdf(robot.urdf.clone()),
+                importing.urdf_loader_options.clone(),
+                robot.mesh_dir.clone()
+                    .or_else(|| robot.robot_file_path.parent().map(|v| v.to_path_buf()))
+                    .unwrap_or_else(|| Path::new("./").to_path_buf())
+                    .as_path()
+            );
             match robot.robot_joint_type {
                 RobotJointType::ImpulseJoints => {
-                    let handles = robot.rapier_urdf_robot.take().unwrap()
+                    let handles = urdf_robot
                         .insert_using_impulse_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,
@@ -124,7 +134,7 @@ pub fn init_robots(
                     }
                 },
                 RobotJointType::MultibodyJoints(options) => {
-                    let handles = robot.rapier_urdf_robot.take().unwrap()
+                    let handles = urdf_robot
                         .insert_using_multibody_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,

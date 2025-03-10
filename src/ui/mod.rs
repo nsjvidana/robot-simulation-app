@@ -1,5 +1,5 @@
 pub mod position_tools;
-mod import;
+pub mod import;
 mod simulation;
 mod ribbon;
 mod motion_planning;
@@ -136,6 +136,8 @@ pub enum EntitySelectionMode {
     SelectRobotPartsLocal,
     /// Select robot parts from multiple robots
     SelectRobotPartsGlobal,
+    /// Select robot joints only from the current `active_robot`.
+    SelectRobotJointsLocal,
 }
 
 #[derive(Resource)]
