@@ -8,7 +8,10 @@ use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEn
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
 use bevy_egui::egui as egui;
 use bevy::input::ButtonInput;
-use crate::ui::motion_planning::{ik_window, motion_planning_ui, MotionPlanning};
+use bevy_rapier3d::dynamics::{RapierImpulseJointHandle, RapierMultibodyJointHandle};
+use bevy_rapier3d::plugin::RapierContext;
+use bevy_rapier3d::prelude::ReadDefaultRapierContext;
+use crate::ui::motion_planning::{ik_window, motion_planning_ui, select_joint_chain, MotionPlanning};
 
 #[derive(Default, Resource)]
 pub struct Ribbon {
@@ -91,7 +94,7 @@ pub fn ribbon_ui(
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
                     ui,
-                    &selected_entities,
+                    &mut selected_entities,
                     &mut motion_planning,
                     ribbon_height
                 );
@@ -186,10 +189,17 @@ fn general_tab(
 }
 
 pub fn ribbon_functionality(
+    mut commands: Commands,
     ribbon: Res<Ribbon>,
     mut selected_entities: ResMut<SelectedEntities>,
     mut position_tools: ResMut<PositionTools>,
     mut transform_q: Query<&mut GlobalTransform>,
+
+    mut motion_planning: NonSendMut<MotionPlanning>,
+
+    robot_part_q: Query<&RobotPart>,
+    joint_q: Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
+    rapier_ctx: ReadDefaultRapierContext,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     physics_sim: Res<PhysicsSimulation>
@@ -206,6 +216,15 @@ pub fn ribbon_functionality(
                 &physics_sim
             );
         },
-        _ => {}
+        _ => {
+            select_joint_chain(
+                &mut commands,
+                &mut selected_entities,
+                &mut motion_planning,
+                &robot_part_q,
+                &joint_q,
+                &rapier_ctx,
+            );
+        }
     }
 }

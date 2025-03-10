@@ -110,8 +110,10 @@ pub struct SelectedEntities {
     /// If the simulation viewport was clicked
     pub viewport_clicked: bool,
     pub pointer_usage_state: PointerUsageState,
-    pub selected_entities: Vec<Entity>,
+
+    pub selected_joints: Vec<Entity>,
     pub selected_robots: Vec<Entity>,
+
     pub active_robot: Option<Entity>,
     pub selection_mode: EntitySelectionMode,
 }
@@ -244,6 +246,10 @@ pub fn select_entities(
                     selected_entities.active_robot = Some(robot);
                 }
             }
+        },
+        EntitySelectionMode::SelectRobotJointsLocal => 'joints_local: {
+            if selected_entities.active_robot.is_none() { break 'joints_local; }
+            let robot = selected_entities.active_robot.unwrap();
         },
         _ => todo!()
     }

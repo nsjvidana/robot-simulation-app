@@ -52,7 +52,7 @@ pub enum IKSolverType {
 
 pub fn motion_planning_ui(
     ui: &mut Ui,
-    selected_entities: &SelectedEntities,
+    selected_entities: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
     ribbon_height: f32,
 ) {
@@ -74,7 +74,7 @@ pub fn motion_planning_ui(
 
 pub fn ik_ui(
     ui: &mut Ui,
-    selected_entities: &SelectedEntities,
+    selected_ents: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
     ribbon_height: f32
 ) -> (egui::Rect, &'static str) {
@@ -82,7 +82,8 @@ pub fn ik_ui(
         let ret = ui.vertical(|ui| {
             let ik_btn = ui.button("Inverse Kinematics");
             if ik_btn.clicked() {
-                if selected_entities.active_robot.is_some() {
+                if selected_ents.active_robot.is_some() {
+                    if !motion_planning.ik_window.open { selected_ents.selected_joints.clear(); }
                     motion_planning.ik_window.open = true;
                 }
                 else {
@@ -138,16 +139,14 @@ pub fn select_joint_chain(
 ) {
     if !motion_planning.ik_window.open { return; }
 
+    selected_ents.selection_mode = EntitySelectionMode::SelectRobotJointsLocal;
+
     let ik_window = &mut motion_planning.ik_window;
     let active_robot = selected_ents.active_robot.unwrap();
 
-    selected_ents.selection_mode = EntitySelectionMode::SelectRobotJointsLocal;
-        selected_ents.selected_robots.clear();
-        selected_ents.selected_robots.push(active_robot);
-
     // If "Create IK Chain" button is clicked
     if ik_window.create_ik_chain {
-        for ent in selected_ents.selected_entities.iter().copied() {
+        for ent in selected_ents.selected_joints.iter().copied() {
             if !robot_part_q.contains(ent) { continue; }
             let robot_ent = robot_part_q.get(ent).unwrap().0;
             if robot_ent != active_robot { continue; }
