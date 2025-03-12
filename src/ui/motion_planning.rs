@@ -5,12 +5,12 @@ use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
-use bevy::prelude::{Commands, Query};
+use bevy::prelude::{Commands, Gizmos, Query};
 use bevy_rapier3d::prelude::{RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint};
 use bevy_salva3d::bevy_rapier;
 use k::{JointType, NodeBuilder};
 use crate::robot::RobotPart;
-use crate::ui::{EntitySelectionMode, SelectedEntities};
+use crate::ui::{EntitySelectionMode, SelectedEntities, UiGizmoGroup};
 
 #[derive(Default)]
 pub struct MotionPlanning {
@@ -65,7 +65,7 @@ pub fn motion_planning_ui(
                     ik_ui(ui, selected_entities, motion_planning, ribbon_height)
                 );
                 // rects.push(
-                //     ik_ui(ui, motion_planning, ribbon_height)
+                //     ik_ui(ui, selected_entities, motion_planning, ribbon_height)
                 // );
             });
     });
@@ -83,7 +83,10 @@ pub fn ik_ui(
             let ik_btn = ui.button("Inverse Kinematics");
             if ik_btn.clicked() {
                 if selected_ents.active_robot.is_some() {
-                    if !motion_planning.ik_window.open { selected_ents.selected_joints.clear(); }
+                    if !motion_planning.ik_window.open {
+                        selected_ents.selected_joints.clear();
+                        selected_ents.selection_mode = EntitySelectionMode::SelectRobotJointsLocal;
+                    }
                     motion_planning.ik_window.open = true;
                 }
                 else {
@@ -135,11 +138,10 @@ pub fn select_joint_chain(
     motion_planning: &mut MotionPlanning,
     robot_part_q: &Query<&RobotPart>,
     joint_q: &Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
-    rapier_ctx: &RapierContext
+    rapier_ctx: &RapierContext,
+    gizmos: &mut Gizmos<UiGizmoGroup>
 ) {
     if !motion_planning.ik_window.open { return; }
-
-    selected_ents.selection_mode = EntitySelectionMode::SelectRobotJointsLocal;
 
     let ik_window = &mut motion_planning.ik_window;
     let active_robot = selected_ents.active_robot.unwrap();

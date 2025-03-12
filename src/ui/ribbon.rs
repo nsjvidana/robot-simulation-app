@@ -202,7 +202,9 @@ pub fn ribbon_functionality(
     rapier_ctx: ReadDefaultRapierContext,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
-    physics_sim: Res<PhysicsSimulation>
+    physics_sim: Res<PhysicsSimulation>,
+
+    mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     match ribbon.tab {
         RibbonTab::General => {
@@ -224,6 +226,7 @@ pub fn ribbon_functionality(
                 &robot_part_q,
                 &joint_q,
                 &rapier_ctx,
+                &mut gizmos
             );
         }
     }

@@ -15,13 +15,13 @@ use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::SystemState;
 use bevy::image::Image;
 use bevy::math::Vec3;
-use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, Local, Mat3, MouseButton, Name, Plugin, Quat, Query, Ray3d, Reflect, Res, ResMut, Resource, Single, Transform, Window, With, World};
+use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, KeyCode, Local, Mat3, MouseButton, Name, Or, Parent, Plugin, Quat, Query, Ray3d, Reflect, Res, ResMut, Resource, Single, Transform, Window, With, World};
 use bevy_egui::egui::{Align, ComboBox, Label, Layout, TextureId, Ui, UiBuilder};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use bevy_rapier3d::parry::query::RayCast;
 use bevy_rapier3d::plugin::TimestepMode;
-use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, ReadDefaultRapierContext};
+use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, ReadDefaultRapierContext};
 use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
@@ -29,6 +29,7 @@ use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
 use bevy::gizmos::GizmoPlugin;
+use bevy_rapier3d::rapier::crossbeam::channel::internal::select;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -111,11 +112,30 @@ pub struct SelectedEntities {
     pub viewport_clicked: bool,
     pub pointer_usage_state: PointerUsageState,
 
-    pub selected_joints: Vec<Entity>,
+    selected_joints: Vec<Entity>,
     pub selected_robots: Vec<Entity>,
 
     pub active_robot: Option<Entity>,
     pub selection_mode: EntitySelectionMode,
+}
+
+impl SelectedEntities {
+    pub fn set_selection_mode(&mut self, selection_mode: EntitySelectionMode) -> &mut Self {
+        match selection_mode {
+            EntitySelectionMode::SelectOneRobot => {
+                self.selected_robots.clear();
+                if let Some(active_robot) = self.active_robot {
+                    self.selected_robots.push(active_robot);
+                }
+            },
+            EntitySelectionMode::SelectRobotJointsLocal => {
+                self.selected_joints.clear();
+            },
+            _ => todo!()
+        }
+        self.selection_mode = selection_mode;
+        self
+    }
 }
 
 /// An enum that tells how the pointer using the Positioning tools
@@ -229,7 +249,10 @@ pub fn update_clicked_entities(
 
 pub fn select_entities(
     mut selected_entities: ResMut<SelectedEntities>,
-    robot_part_q: Query<&RobotPart>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    robot_part_q: Query<(&RobotPart, Option<&Parent>)>,
+    robot_joint_q: Query<Entity, Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>>,
 ) {
     if !selected_entities.viewport_clicked
         || matches!(selected_entities.pointer_usage_state, PointerUsageState::UsingTool)
@@ -241,7 +264,7 @@ pub fn select_entities(
             selected_entities.selected_robots.clear();
             selected_entities.active_robot = None;
             if let Some(ent) = selected_entities.clicked_entities.first() {
-                if let Ok(robot) = robot_part_q.get(*ent).map(|v| v.0) {
+                if let Ok(robot) = robot_part_q.get(*ent).map(|(part, _)| part.0) {
                     selected_entities.selected_robots.push(robot);
                     selected_entities.active_robot = Some(robot);
                 }
@@ -249,7 +272,42 @@ pub fn select_entities(
         },
         EntitySelectionMode::SelectRobotJointsLocal => 'joints_local: {
             if selected_entities.active_robot.is_none() { break 'joints_local; }
+            if !mouse.just_pressed(MouseButton::Left) { break 'joints_local; }
+            let shiftclick = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+
             let robot = selected_entities.active_robot.unwrap();
+            if let Some(ent) = selected_entities.clicked_entities.first().copied() {
+                let part = robot_part_q.get(ent);
+                // If the selected entity isn't a part of the active robot, don't select it.
+                if !part.map_or_else(|_| false, |(part, _)| part.0 == robot) { break 'joints_local; }
+                let (part, parent) = part.unwrap();
+
+                // If clicked ent isn't a joint, dont select it.
+                if !parent.map_or_else(
+                    || robot_joint_q.contains(ent),
+                    |par| robot_joint_q.contains(ent) || robot_joint_q.contains(par.get())
+                ) { break 'joints_local; }
+
+                if shiftclick {
+                    if let Some(idx) = selected_entities.selected_joints.iter().position(|e| *e == ent) {
+                        println!("deselect");
+                        selected_entities.selected_joints.remove(idx);
+                    }
+                    else {
+                        println!("select");
+                        selected_entities.selected_joints.push(ent);
+                    }
+                }
+                else {
+                    println!("select only one");
+                    selected_entities.selected_joints.clear();
+                    selected_entities.selected_joints.push(ent);
+                }
+            }
+            else if !shiftclick {
+                println!("deselect all");
+                selected_entities.selected_joints.clear();
+            }
         },
         _ => todo!()
     }
