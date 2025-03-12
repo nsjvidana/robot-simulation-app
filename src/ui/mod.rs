@@ -24,7 +24,7 @@ use bevy_rapier3d::plugin::TimestepMode;
 use bevy_rapier3d::prelude::{DefaultRapierContext, PhysicsSet, QueryFilter, RapierConfiguration, RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, ReadDefaultRapierContext};
 use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
 use k::{InverseKinematicsSolver, SerialChain};
-use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
+use k::nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;

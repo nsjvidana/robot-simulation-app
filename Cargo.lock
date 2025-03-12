@@ -4596,7 +4596,6 @@ dependencies = [
  "bevy_salva3d",
  "bincode",
  "k",
- "nalgebra 0.33.2",
  "ncollide3d",
  "openrr-planner",
  "parking_lot",

@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-use std::path::Path;
-use bevy::prelude::{Component, Dir3, Entity, GlobalTransform};
+use bevy::prelude::{Component, Entity, GlobalTransform};
 use bevy_rapier3d::geometry::ActiveHooks;
 use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, CollisionEvent, ContactForceEvent, Group};
 use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::prelude::{CCDSolver, ColliderHandle, ColliderSet, DefaultBroadPhase, EventHandler, ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointHandle, MultibodyJointSet, NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyHandle, RigidBodySet};
-use nalgebra::{ArrayStorage, Matrix3, Vector, Vector3};
-use rapier3d_urdf::UrdfRobot;
-use crate::math::Real;
+use bevy_rapier3d::na::{ArrayStorage, Matrix3, Vector, Vector3};
+use std::collections::HashMap;
 
 pub trait IntoBevy {
     type Target;
@@ -70,8 +67,8 @@ impl IntoXurdf for urdf_rs::Pose {
 
     fn into_xurdf(self) -> Self::Target {
         xurdf::Pose {
-            rpy: Vector::from_data(ArrayStorage([self.rpy])),
-            xyz: Vector::from_data(ArrayStorage([self.xyz])),
+            rpy: Vector3::from_data(ArrayStorage([self.rpy])),
+            xyz: Vector3::from_data(ArrayStorage([self.xyz])),
         }
     }
 }

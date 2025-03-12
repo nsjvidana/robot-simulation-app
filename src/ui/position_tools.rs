@@ -10,7 +10,7 @@ use bevy_egui::egui::Ui;
 use bevy_rapier3d::parry::query::RayCast;
 use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
 use bevy_rapier3d::rapier::prelude::Ray;
-use nalgebra::{Isometry3, Rotation3, UnitQuaternion, UnitVector3, Vector3};
+use bevy_rapier3d::na::{Isometry3, Rotation3, UnitQuaternion, UnitVector3, Vector3};
 use crate::ui::ribbon::finish_ui_section_vertical;
 
 /// Contains all the data needed for the Posiion section of the Ribbon

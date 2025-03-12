@@ -171,7 +171,7 @@ pub fn ik_window_function(
             if let Some(joint_idx) = joint_idx {
                 let urdf_joint = robot.urdf.joints.get(joint_idx)
                     .expect("Joint indices don't match with robot!");
-                let node = k::Node::new(k::Joint::from(urdf_joint));
+                let node = k::Node::<Real>::new(k::Joint::from(urdf_joint));
             }
 
             // TODO: add KinematicNode component to ent using robot urdf data
