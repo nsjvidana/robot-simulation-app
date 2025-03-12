@@ -32,8 +32,8 @@ pub struct RobotSerData {
 
 #[derive(Component)]
 pub struct Robot {
-    urdf: urdf_rs::Robot,
-    mesh_dir: Option<PathBuf>,
+    pub urdf: urdf_rs::Robot,
+    pub mesh_dir: Option<PathBuf>,
     pub robot_joint_type: RobotJointType,
     pub robot_file_path: PathBuf,
 }

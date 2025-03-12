@@ -282,26 +282,26 @@ pub fn select_entities(
                 if !part.map_or_else(|_| false, |(part, _)| part.0 == robot) { break 'joints_local; }
                 let (part, parent) = part.unwrap();
 
-                // If clicked ent isn't a joint, dont select it.
-                if !parent.map_or_else(
-                    || robot_joint_q.contains(ent),
-                    |par| robot_joint_q.contains(ent) || robot_joint_q.contains(par.get())
-                ) { break 'joints_local; }
+                // If clicked robot part isn't a joint, dont select it.
+                let joint_ent =
+                    if robot_joint_q.contains(ent) { ent }
+                    else if parent.is_some_and(|par| robot_joint_q.contains(par.get())) { parent.unwrap().get() }
+                    else { break 'joints_local };
 
                 if shiftclick {
-                    if let Some(idx) = selected_entities.selected_joints.iter().position(|e| *e == ent) {
+                    if let Some(idx) = selected_entities.selected_joints.iter().position(|e| *e == joint_ent) {
                         println!("deselect");
                         selected_entities.selected_joints.remove(idx);
                     }
                     else {
                         println!("select");
-                        selected_entities.selected_joints.push(ent);
+                        selected_entities.selected_joints.push(joint_ent);
                     }
                 }
                 else {
                     println!("select only one");
                     selected_entities.selected_joints.clear();
-                    selected_entities.selected_joints.push(ent);
+                    selected_entities.selected_joints.push(joint_ent);
                 }
             }
             else if !shiftclick {

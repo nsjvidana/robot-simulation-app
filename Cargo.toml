@@ -20,11 +20,7 @@ openrr-planner = "0.1.0"
 ncollide3d = "0.33.0"
 urdf-rs = "0.6.9"
 xurdf = "0.2.5"
-
-[dependencies.k]
-git = "https://github.com/nsjvidana/k.git"
-rev = "978e01f"
-version = "0.32.0"
+k = "0.29.1"
 
 [profile.dev.package."*"]
 opt-level = 2

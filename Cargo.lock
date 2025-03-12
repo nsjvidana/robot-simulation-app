@@ -3216,19 +3216,7 @@ dependencies = [
  "simba 0.7.3",
  "thiserror 1.0.69",
  "tracing",
- "urdf-rs 0.6.9",
-]
-
-[[package]]
-name = "k"
-version = "0.32.0"
-source = "git+https://github.com/nsjvidana/k.git?rev=978e01f#978e01fc4d8257103d1c969f8ccfb15440a46368"
-dependencies = [
- "nalgebra 0.33.2",
- "simba 0.7.3",
- "thiserror 1.0.69",
- "tracing",
- "urdf-rs 0.9.0",
+ "urdf-rs",
 ]
 
 [[package]]
@@ -4039,7 +4027,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "644a01bd0a66d33ebb3d6671ecfb0c5e8dc0265631d130ada81fb9eb99b26f65"
 dependencies = [
  "assimp",
- "k 0.29.1",
+ "k",
  "mesh-loader",
  "ncollide3d",
  "num-traits",
@@ -4052,7 +4040,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tracing",
  "trajectory",
- "urdf-rs 0.6.9",
+ "urdf-rs",
 ]
 
 [[package]]
@@ -4338,7 +4326,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
 dependencies = [
  "memchr",
- "serde",
 ]
 
 [[package]]
@@ -4608,7 +4595,7 @@ dependencies = [
  "bevy_rapier3d",
  "bevy_salva3d",
  "bincode",
- "k 0.32.0",
+ "k",
  "nalgebra 0.33.2",
  "ncollide3d",
  "openrr-planner",
@@ -4616,7 +4603,7 @@ dependencies = [
  "rapier3d-urdf",
  "rfd",
  "serde",
- "urdf-rs 0.6.9",
+ "urdf-rs",
  "xurdf",
 ]
 
@@ -5575,20 +5562,6 @@ checksum = "c5007f7a8820f8aabfaed1f84faefa468c0488342af620fb39a70a3755ac2c2e"
 dependencies = [
  "RustyXML",
  "once_cell",
- "regex",
- "serde",
- "serde-xml-rs",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "urdf-rs"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "074515a3e6dc230bbbdcf35830fd71b67b55ae2ac22bc4ff69d89412fc84b830"
-dependencies = [
- "RustyXML",
- "quick-xml",
  "regex",
  "serde",
  "serde-xml-rs",

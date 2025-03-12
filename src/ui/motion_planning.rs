@@ -9,7 +9,7 @@ use bevy::prelude::{Commands, Gizmos, Query};
 use bevy_rapier3d::prelude::{RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint};
 use bevy_salva3d::bevy_rapier;
 use k::{JointType, NodeBuilder};
-use crate::robot::RobotPart;
+use crate::robot::{RapierRobotHandles, Robot, RobotJointType, RobotPart};
 use crate::ui::{EntitySelectionMode, SelectedEntities, UiGizmoGroup};
 
 #[derive(Default)]
@@ -132,10 +132,11 @@ pub fn ik_window(
         });
 }
 
-pub fn select_joint_chain(
+pub fn ik_window_function(
     commands: &mut Commands,
     selected_ents: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
+    robot_q: &Query<(&Robot, &RapierRobotHandles)>,
     robot_part_q: &Query<&RobotPart>,
     joint_q: &Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
     rapier_ctx: &RapierContext,
@@ -152,23 +153,27 @@ pub fn select_joint_chain(
             if !robot_part_q.contains(ent) { continue; }
             let robot_ent = robot_part_q.get(ent).unwrap().0;
             if robot_ent != active_robot { continue; }
-            let (impulse_j, mb_j) = joint_q.get(ent).unwrap();
+            let joint_handle_index = joint_q.get(ent)
+                .map(|(imp, mb)|
+                    if let Some(imp) = imp { Some(imp.0.0) }
+                    else if let Some(mb) = mb { Some(mb.0.0) }
+                    else { None }
+                )
+                .unwrap();
+            let (robot, rapier_handles) = robot_q.get(robot_ent).expect("Robot doesn't have robot/handles component!");
 
-            let joint =
-                if let Some(impulse) = impulse_j {
-                    Some(rapier_ctx.impulse_joints.get(impulse.0).unwrap().data)
-                }
-                else if let Some(mb_j) = mb_j {
-                    let joint = rapier_ctx.multibody_joints.get(mb_j.0)
-                        .map(|(mb, link_id)| mb.link(link_id).unwrap().joint.data)
-                        .unwrap();
-                    Some(joint)
-                }
-                else {
-                    None
-                };
-            if joint.is_none() { continue; }
-            let joint = joint.unwrap();
+            let joint_idx = rapier_handles.joints
+                .iter()
+                .position(|h| h.joint.map_or_else(
+                    || joint_handle_index.is_none(),
+                    |j| joint_handle_index.is_some_and(|v| v == j)
+                ));
+            if let Some(joint_idx) = joint_idx {
+                let urdf_joint = robot.urdf.joints.get(joint_idx)
+                    .expect("Joint indices don't match with robot!");
+                let node = k::Node::new(k::Joint::from(urdf_joint));
+            }
+
             // TODO: add KinematicNode component to ent using robot urdf data
             // commands.entity(ent)
             //     .insert(KinematicNode {

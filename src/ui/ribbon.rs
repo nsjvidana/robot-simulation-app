@@ -11,7 +11,7 @@ use bevy::input::ButtonInput;
 use bevy_rapier3d::dynamics::{RapierImpulseJointHandle, RapierMultibodyJointHandle};
 use bevy_rapier3d::plugin::RapierContext;
 use bevy_rapier3d::prelude::ReadDefaultRapierContext;
-use crate::ui::motion_planning::{ik_window, motion_planning_ui, select_joint_chain, MotionPlanning};
+use crate::ui::motion_planning::{ik_window, motion_planning_ui, ik_window_function, MotionPlanning};
 
 #[derive(Default, Resource)]
 pub struct Ribbon {
@@ -138,7 +138,7 @@ macro_rules! finish_ribbon_tab {
 }
 
 pub(crate) use finish_ribbon_tab;
-use crate::robot::RobotPart;
+use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 
 fn general_tab(
     ui: &mut Ui,
@@ -197,6 +197,7 @@ pub fn ribbon_functionality(
 
     mut motion_planning: NonSendMut<MotionPlanning>,
 
+    robot_q: Query<(&Robot, &RapierRobotHandles)>,
     robot_part_q: Query<&RobotPart>,
     joint_q: Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
     rapier_ctx: ReadDefaultRapierContext,
@@ -219,10 +220,11 @@ pub fn ribbon_functionality(
             );
         },
         _ => {
-            select_joint_chain(
+            ik_window_function(
                 &mut commands,
                 &mut selected_entities,
                 &mut motion_planning,
+                &robot_q,
                 &robot_part_q,
                 &joint_q,
                 &rapier_ctx,
