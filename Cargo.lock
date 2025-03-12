@@ -1276,6 +1276,7 @@ dependencies = [
 [[package]]
 name = "bevy_salva3d"
 version = "0.1.0"
+source = "git+https://github.com/nsjvidana/bevy_salva.git?rev=9e97453#9e9745305bcf5d956ca7088f97b44ca5f56ecee8"
 dependencies = [
  "bevy",
  "bevy_rapier3d",

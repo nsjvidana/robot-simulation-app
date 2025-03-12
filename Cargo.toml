@@ -10,7 +10,7 @@ bevy_egui = { version = "0.31.1", features = ["render"] }
 bevy_flycam = "0.15.0"
 bevy_rapier3d = { version = "0.28.0", features = ["serde-serialize"] }
 serde = "1.0.217"
-bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier"] }
+bevy_salva3d = { git = "https://github.com/nsjvidana/bevy_salva.git", rev = "9e97453", features = ["rapier"] }
 parking_lot = "0.12.3"
 rfd = "0.15.2"
 rapier3d-urdf = { version = "0.3.0", features = ["stl"] }
