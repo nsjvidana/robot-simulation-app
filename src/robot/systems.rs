@@ -273,7 +273,10 @@ pub fn init_robots(
             transform: transform.map_or_else(|| GlobalTransform::default(), |v| *v),
         });
         commands.entity(robot_entity)
-            .insert(RobotHandle(robot_idx))
+            .insert((
+                RobotHandle(robot_idx),
+                RapierRobotHandles(handles)
+            ))
             .insert_if_new(Transform::default());
     }
 }
