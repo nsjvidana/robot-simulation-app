@@ -289,8 +289,7 @@ pub fn select_entities(
             ref mut selection_preview_joints,
             ref mut hovered_joint
         } => 'serial_chain_local: {
-            // Drawing selected root/chain
-            if let Some(root) = *selection_root {
+            let mut draw_chain = |root: Entity, joints: &Vec<Entity>, gizmos: &mut Gizmos<UiGizmoGroup>| {
                 let root_pos = transform_q.get(root).unwrap().translation();
                 gizmos.sphere(
                     cam_pos + (root_pos - cam_pos).normalize() * 10.,
@@ -299,7 +298,7 @@ pub fn select_entities(
                 );
 
                 let prev_pos = root_pos;
-                for joint in selected_joints.iter() {
+                for joint in joints.iter() {
                     let joint_pos = transform_q.get(*joint).unwrap().translation();
                     gizmos.line(
                         prev_pos,
@@ -307,6 +306,10 @@ pub fn select_entities(
                         Color::linear_rgba(0., 1., 0., 1.)
                     )
                 }
+            };
+            // Drawing selected root/chain
+            if let Some(root) = *selection_root {
+                draw_chain(root, selected_joints, &mut gizmos);
             }
 
             let prev_hovered = hovered_joint.take();
@@ -339,16 +342,19 @@ pub fn select_entities(
                 };
             *hovered_joint = Some(joint_ent);
 
-            // If hovered joint changed, update selected joint chain
+            // If hovered joint changed, update selection joint chain and display it
             if alt_pressed && prev_hovered.is_none_or(|e| e != joint_ent) {
                 selection_preview_joints.clear();
-                if let Some(root) = selection_root {// Chain selection
+                if let Some(root) = *selection_root {// Chain selection
                     let robot = robot_q.get(active_robot)
                         .expect("Active robot missing Robot component!");
                     let mut curr_joint = robot_joint_q.get(joint_ent).ok();
                     let mut curr_joint_ent = joint_ent;
                     while curr_joint.is_some() {
                         selection_preview_joints.push(curr_joint_ent);
+                        if curr_joint_ent == root {
+                            break;
+                        }
                         let (imp_j, mb_j) = curr_joint.unwrap();
                         let joint_parent = match robot.robot_joint_type {
                             RobotJointType::ImpulseJoints => {
@@ -370,6 +376,12 @@ pub fn select_entities(
                     0.1,
                     Color::linear_rgba(1., 1., 1., 0.3)
                 );
+            }
+
+            if alt_pressed {
+                if let Some(root) = *selection_root {
+                    draw_chain(root, selection_preview_joints, &mut gizmos);
+                }
             }
         },
         _ => {}
