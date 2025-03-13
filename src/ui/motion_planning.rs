@@ -5,7 +5,7 @@ use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
-use bevy::prelude::{Commands, Gizmos, Query};
+use bevy::prelude::{Commands, Gizmos, GlobalTransform, Query};
 use bevy_rapier3d::prelude::{RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint};
 use bevy_salva3d::bevy_rapier;
 use k::{JointType, NodeBuilder};
@@ -85,7 +85,12 @@ pub fn ik_ui(
                 if selected_ents.active_robot.is_some() {
                     if !motion_planning.ik_window.open {
                         selected_ents.selected_joints.clear();
-                        selected_ents.selection_mode = EntitySelectionMode::SelectRobotJointsLocal;
+                        selected_ents.selection_mode = EntitySelectionMode::SelectSerialChainLocal {
+                            selection_preview_joints: vec![],
+                            selected_joints: vec![],
+                            selection_root: None,
+                            hovered_joint: None
+                        };
                     }
                     motion_planning.ik_window.open = true;
                 }
@@ -138,6 +143,7 @@ pub fn ik_window_function(
     motion_planning: &mut MotionPlanning,
     robot_q: &Query<(&Robot, &RapierRobotHandles)>,
     robot_part_q: &Query<&RobotPart>,
+    transform_q: &Query<&mut GlobalTransform>,
     joint_q: &Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
     rapier_ctx: &RapierContext,
     gizmos: &mut Gizmos<UiGizmoGroup>
@@ -150,47 +156,38 @@ pub fn ik_window_function(
     // If "Create IK Chain" button is clicked
     if ik_window.create_ik_chain {
         for ent in selected_ents.selected_joints.iter().copied() {
-            if !robot_part_q.contains(ent) { continue; }
-            let robot_ent = robot_part_q.get(ent).unwrap().0;
-            if robot_ent != active_robot { continue; }
-            let joint_handle_index = joint_q.get(ent)
-                .map(|(imp, mb)|
-                    if let Some(imp) = imp { Some(imp.0.0) }
-                    else if let Some(mb) = mb { Some(mb.0.0) }
-                    else { None }
-                )
-                .unwrap();
+            // Joint validity checks
+            // If selected joint isn't a robot part
+            let robot_ent = robot_part_q.get(ent);
+                if !robot_part_q.contains(ent) { continue; }
+                let robot_ent = robot_ent.unwrap().0;
+                if robot_ent != active_robot { continue; }
+            let joint = joint_q.get(ent);
+                if joint.is_err() || joint.map(|v| v.0.is_none() && v.1.is_none()).unwrap() {
+                    continue;
+                }
+                let (impulse, mbj) = joint.unwrap();
+            let joint_handle_index =
+                if let Some(imp) = impulse { imp.0.0 }
+                else if let Some(mbj) = mbj { mbj.0.0 }
+                else { continue; };
+
             let (robot, rapier_handles) = robot_q.get(robot_ent).expect("Robot doesn't have robot/handles component!");
 
             let joint_idx = rapier_handles.joints
                 .iter()
-                .position(|h| h.joint.map_or_else(
-                    || joint_handle_index.is_none(),
-                    |j| joint_handle_index.is_some_and(|v| v == j)
-                ));
+                .position(|h|
+                    h.joint.is_some() && h.joint.unwrap() == joint_handle_index
+                );
             if let Some(joint_idx) = joint_idx {
                 let urdf_joint = robot.urdf.joints.get(joint_idx)
                     .expect("Joint indices don't match with robot!");
                 let node = k::Node::<Real>::new(k::Joint::from(urdf_joint));
+                commands.entity(ent)
+                    .insert(KinematicNode(node));
             }
 
             // TODO: add KinematicNode component to ent using robot urdf data
-            // commands.entity(ent)
-            //     .insert(KinematicNode {
-            //         node: NodeBuilder::new()
-            //             .joint_type(
-            //                 if joint.as_fixed().is_some() { JointType::Fixed }
-            //                 else if joint.as_revolute().is_some() {
-            //                     JointType::Rotational { axis: joint.local_axis1() }
-            //                 }
-            //                 else if joint.locked_axes.is_empty() {
-            //                     JointType::
-            //                 }
-            //                 else if joint.as_prismatic().is_some() {
-            //                     JointType::Linear { axis: joint.local_axis1() }
-            //                 }
-            //             )
-            //     });
         }
         ik_window.create_ik_chain = false;
     }

@@ -1,10 +1,22 @@
+use std::ops::{Deref, DerefMut};
 use bevy::prelude::Component;
 use crate::math::{angle_to, project_onto_plane, Real};
 use k::{Constraints, Error, InverseKinematicsSolver, Isometry3, JointType, SerialChain, Vector3};
 
 #[derive(Component)]
-pub struct KinematicNode {
-    pub node: k::Node<Real>
+pub struct KinematicNode(pub k::Node<Real>);
+
+impl Deref for KinematicNode {
+    type Target = k::Node<Real>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for KinematicNode {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 macro_rules! cyclic_impl {

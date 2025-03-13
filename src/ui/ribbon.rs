@@ -226,6 +226,7 @@ pub fn ribbon_functionality(
                 &mut motion_planning,
                 &robot_q,
                 &robot_part_q,
+                &transform_q,
                 &joint_q,
                 &rapier_ctx,
                 &mut gizmos
