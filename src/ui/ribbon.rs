@@ -219,7 +219,7 @@ pub fn ribbon_functionality(
                 &physics_sim
             );
         },
-        _ => {
+        RibbonTab::MotionPlanning => {
             ik_window_function(
                 &mut commands,
                 &mut selected_entities,
@@ -231,6 +231,7 @@ pub fn ribbon_functionality(
                 &rapier_ctx,
                 &mut gizmos
             );
-        }
+        },
+        _ => {}
     }
 }

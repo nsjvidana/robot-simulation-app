@@ -148,7 +148,7 @@ pub enum PointerUsageState {
     NotUsed
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub enum EntitySelectionMode {
     /// Only one robot can be selected at a time.
     #[default]
@@ -278,7 +278,7 @@ pub fn select_entities(
     let alt_pressed = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
     let shift_pressed = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    // Selection UI
+    // Selection visuals + getting selection entities
     let cam_pos = scene_window_data.camera_transform.translation();
     let hovered = selected_entities.hovered_entities.first().copied();
     let active_robot = selected_entities.active_robot;
@@ -289,12 +289,12 @@ pub fn select_entities(
             ref mut selection_preview_joints,
             ref mut hovered_joint
         } => 'serial_chain_local: {
-            let mut draw_chain = |root: Entity, joints: &Vec<Entity>, gizmos: &mut Gizmos<UiGizmoGroup>| {
+            let mut draw_chain = |root: Entity, joints: &Vec<Entity>, gizmos: &mut Gizmos<UiGizmoGroup>, alpha: f32| {
                 let root_pos = transform_q.get(root).unwrap().translation();
                 gizmos.sphere(
                     cam_pos + (root_pos - cam_pos).normalize() * 10.,
                     0.1,
-                    Color::linear_rgba(1., 1., 1., 1.)
+                    Color::linear_rgba(1., 1., 1., alpha)
                 );
 
                 let prev_pos = root_pos;
@@ -303,13 +303,13 @@ pub fn select_entities(
                     gizmos.line(
                         prev_pos,
                         joint_pos,
-                        Color::linear_rgba(0., 1., 0., 1.)
+                        Color::linear_rgba(0., 1., 0., alpha)
                     )
                 }
             };
             // Drawing selected root/chain
             if let Some(root) = *selection_root {
-                draw_chain(root, selected_joints, &mut gizmos);
+                draw_chain(root, selected_joints, &mut gizmos, 1.);
             }
 
             let prev_hovered = hovered_joint.take();
@@ -328,7 +328,7 @@ pub fn select_entities(
             {
                 break 'serial_chain_local;
             }
-            let (part, parent) = part.unwrap();
+            let (_, parent) = part.unwrap();
             // Get joint entity
             let joint_ent =
                 if robot_joint_q.contains(hovered) {
@@ -369,7 +369,8 @@ pub fn select_entities(
                     }
                 }
             }
-            else if !alt_pressed {// Draw root selection
+            // Draw root selection
+            else if !alt_pressed {
                 let ent_pos = transform_q.get(hovered).unwrap().translation();
                 gizmos.sphere(
                     cam_pos + (ent_pos - cam_pos).normalize() * 10.,
@@ -380,7 +381,7 @@ pub fn select_entities(
 
             if alt_pressed {
                 if let Some(root) = *selection_root {
-                    draw_chain(root, selection_preview_joints, &mut gizmos);
+                    draw_chain(root, selection_preview_joints, &mut gizmos, 0.3);
                 }
             }
         },
@@ -448,12 +449,18 @@ pub fn select_entities(
         } => {
             // Selecting root
             if !alt_pressed && hovered_joint.is_some() {
-                *selection_root = Some(hovered_joint.unwrap())
+                *selection_root = Some(hovered_joint.unwrap());
+                selected_joints.clear();
             }
-            else if let Some(root) = *selection_root {
-                if alt_pressed {
-
-                }
+            // Selecting joint chain
+            else if selection_root.is_some() && alt_pressed {
+                selected_joints.clear();
+                selected_joints.append(&mut selection_preview_joints.clone());
+            }
+            // If nothing was under pointer when clicking
+            else {
+                selected_joints.clear();
+                *selection_root = None;
             }
         },
         _ => todo!()

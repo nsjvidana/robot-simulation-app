@@ -183,11 +183,13 @@ pub fn ik_window_function(
                 let urdf_joint = robot.urdf.joints.get(joint_idx)
                     .expect("Joint indices don't match with robot!");
                 let node = k::Node::<Real>::new(k::Joint::from(urdf_joint));
+                println!("Adding kinematic node to joint {ent}");
                 commands.entity(ent)
                     .insert(KinematicNode(node));
             }
-
-            // TODO: add KinematicNode component to ent using robot urdf data
+            else {
+                println!("Failed adding kinematic node to joint {ent}");
+            }
         }
         ik_window.create_ik_chain = false;
     }
