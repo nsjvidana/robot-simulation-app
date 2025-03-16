@@ -1,5 +1,5 @@
 use std::ops::Mul;
-use bevy::prelude::{Commands, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Query, Res, ResMut, Resource};
+use bevy::prelude::{Commands, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::EguiContexts;
 use bevy_egui::egui::{Align, Color32, Layout, Rgba, Ui, UiBuilder};
 use crate::ui::import::{import_ui, RobotImporting};
@@ -8,7 +8,7 @@ use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEn
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
 use bevy_egui::egui as egui;
 use bevy::input::ButtonInput;
-use bevy_rapier3d::dynamics::{RapierImpulseJointHandle, RapierMultibodyJointHandle};
+use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle};
 use bevy_rapier3d::plugin::RapierContext;
 use bevy_rapier3d::prelude::ReadDefaultRapierContext;
 use crate::ui::motion_planning::{ik_window, motion_planning_ui, ik_window_function, MotionPlanning};
@@ -199,7 +199,10 @@ pub fn ribbon_functionality(
 
     robot_q: Query<(&Robot, &RapierRobotHandles)>,
     robot_part_q: Query<&RobotPart>,
-    joint_q: Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
+    joint_q: Query<
+        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>),
+        Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
+    >,
     rapier_ctx: ReadDefaultRapierContext,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
@@ -225,11 +228,7 @@ pub fn ribbon_functionality(
                 &mut selected_entities,
                 &mut motion_planning,
                 &robot_q,
-                &robot_part_q,
-                &transform_q,
                 &joint_q,
-                &rapier_ctx,
-                &mut gizmos
             );
         },
         _ => {}

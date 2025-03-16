@@ -5,7 +5,8 @@ use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
-use bevy::prelude::{Commands, Gizmos, GlobalTransform, Query};
+use bevy::prelude::{Commands, Gizmos, GlobalTransform, Or, Query, With};
+use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint};
 use bevy_rapier3d::prelude::{RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint};
 use bevy_salva3d::bevy_rapier;
 use k::{JointType, NodeBuilder};
@@ -142,37 +143,35 @@ pub fn ik_window_function(
     selected_ents: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
     robot_q: &Query<(&Robot, &RapierRobotHandles)>,
-    robot_part_q: &Query<&RobotPart>,
-    transform_q: &Query<&mut GlobalTransform>,
-    joint_q: &Query<(Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>)>,
-    rapier_ctx: &RapierContext,
-    gizmos: &mut Gizmos<UiGizmoGroup>
+    joint_q: &Query<
+        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>),
+        Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
+    >,
 ) {
     if !motion_planning.ik_window.open { return; }
 
     let ik_window = &mut motion_planning.ik_window;
     let active_robot = selected_ents.active_robot.unwrap();
 
+    let selected_joints = {
+        match selected_ents.selection_mode {
+            EntitySelectionMode::SelectSerialChainLocal { ref selected_joints, .. } => {
+                selected_joints
+            }
+            _ => return
+        }
+    };
+
     // If "Create IK Chain" button is clicked
     if ik_window.create_ik_chain {
-        for ent in selected_ents.selected_joints.iter().copied() {
-            // Joint validity checks
-            // If selected joint isn't a robot part
-            let robot_ent = robot_part_q.get(ent);
-                if !robot_part_q.contains(ent) { continue; }
-                let robot_ent = robot_ent.unwrap().0;
-                if robot_ent != active_robot { continue; }
-            let joint = joint_q.get(ent);
-                if joint.is_err() || joint.map(|v| v.0.is_none() && v.1.is_none()).unwrap() {
-                    continue;
-                }
-                let (impulse, mbj) = joint.unwrap();
+        for ent in selected_joints.iter().copied() {
+            let (impulse, mbj) = joint_q.get(ent).unwrap();
             let joint_handle_index =
                 if let Some(imp) = impulse { imp.0.0 }
                 else if let Some(mbj) = mbj { mbj.0.0 }
                 else { continue; };
 
-            let (robot, rapier_handles) = robot_q.get(robot_ent).expect("Robot doesn't have robot/handles component!");
+            let (robot, rapier_handles) = robot_q.get(active_robot).expect("Robot doesn't have robot/handles component!");
 
             let joint_idx = rapier_handles.joints
                 .iter()
@@ -186,9 +185,6 @@ pub fn ik_window_function(
                 println!("Adding kinematic node to joint {ent}");
                 commands.entity(ent)
                     .insert(KinematicNode(node));
-            }
-            else {
-                println!("Failed adding kinematic node to joint {ent}");
             }
         }
         ik_window.create_ik_chain = false;
