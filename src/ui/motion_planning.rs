@@ -65,9 +65,6 @@ pub fn motion_planning_ui(
                 rects.push(
                     ik_ui(ui, selected_entities, motion_planning, ribbon_height)
                 );
-                // rects.push(
-                //     ik_ui(ui, selected_entities, motion_planning, ribbon_height)
-                // );
             });
     });
     finish_ribbon_tab!(ui, rects);

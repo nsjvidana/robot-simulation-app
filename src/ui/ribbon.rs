@@ -198,17 +198,13 @@ pub fn ribbon_functionality(
     mut motion_planning: NonSendMut<MotionPlanning>,
 
     robot_q: Query<(&Robot, &RapierRobotHandles)>,
-    robot_part_q: Query<&RobotPart>,
     joint_q: Query<
         (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>),
         Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
     >,
-    rapier_ctx: ReadDefaultRapierContext,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     physics_sim: Res<PhysicsSimulation>,
-
-    mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     match ribbon.tab {
         RibbonTab::General => {
