@@ -141,7 +141,7 @@ pub fn ik_window_function(
     motion_planning: &mut MotionPlanning,
     robot_q: &Query<(&Robot, &RapierRobotHandles)>,
     joint_q: &Query<
-        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>),
+        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>, Option<&KinematicNode>),
         Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
     >,
 ) {
@@ -149,6 +149,7 @@ pub fn ik_window_function(
 
     let ik_window = &mut motion_planning.ik_window;
     let active_robot = selected_ents.active_robot.unwrap();
+    let (robot, rapier_handles) = robot_q.get(active_robot).expect("Robot doesn't have robot/handles component!");
 
     let selected_joints = {
         match selected_ents.selection_mode {
@@ -162,26 +163,29 @@ pub fn ik_window_function(
     // If "Create IK Chain" button is clicked
     if ik_window.create_ik_chain {
         for ent in selected_joints.iter().copied() {
-            let (impulse, mbj) = joint_q.get(ent).unwrap();
+            let (impulse, mbj, k_node) = joint_q.get(ent).unwrap();
             let joint_handle_index =
                 if let Some(imp) = impulse { imp.0.0 }
                 else if let Some(mbj) = mbj { mbj.0.0 }
                 else { continue; };
 
-            let (robot, rapier_handles) = robot_q.get(active_robot).expect("Robot doesn't have robot/handles component!");
-
-            let joint_idx = rapier_handles.joints
-                .iter()
-                .position(|h|
-                    h.joint.is_some() && h.joint.unwrap() == joint_handle_index
-                );
-            if let Some(joint_idx) = joint_idx {
-                let urdf_joint = robot.urdf.joints.get(joint_idx)
-                    .expect("Joint indices don't match with robot!");
-                let node = k::Node::<Real>::new(k::Joint::from(urdf_joint));
-                println!("Adding kinematic node to joint {ent}");
-                commands.entity(ent)
-                    .insert(KinematicNode(node));
+            if k_node.is_none() {
+                let joint_idx = rapier_handles.joints
+                    .iter()
+                    .position(|h|
+                        h.joint.is_some() && h.joint.unwrap() == joint_handle_index
+                    );
+                if let Some(joint_idx) = joint_idx {
+                    let urdf_joint = robot.urdf.joints.get(joint_idx)
+                        .expect("Joint indices don't match with robot!");
+                    let node = k::Node::<Real>::new(k::Joint::from(urdf_joint));
+                    println!("Adding kinematic node to joint {ent}");
+                    commands.entity(ent)
+                        .insert(KinematicNode(node));
+                }
+            }
+            else {
+                // TODO: add joint's kinematic node to robot kinematics component.
             }
         }
         ik_window.create_ik_chain = false;

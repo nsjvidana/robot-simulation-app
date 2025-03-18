@@ -138,6 +138,7 @@ macro_rules! finish_ribbon_tab {
 }
 
 pub(crate) use finish_ribbon_tab;
+use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 
 fn general_tab(
@@ -199,7 +200,7 @@ pub fn ribbon_functionality(
 
     robot_q: Query<(&Robot, &RapierRobotHandles)>,
     joint_q: Query<
-        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>),
+        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>, Option<&KinematicNode>),
         Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
     >,
     scene_window_data: Res<SceneWindowData>,
