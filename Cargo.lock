@@ -5554,8 +5554,7 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 [[package]]
 name = "urdf-rs"
 version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5007f7a8820f8aabfaed1f84faefa468c0488342af620fb39a70a3755ac2c2e"
+source = "git+https://github.com/nsjvidana/urdf-rs.git?rev=4710127#4710127865e6697c6246c3356148e5366f62347e"
 dependencies = [
  "RustyXML",
  "once_cell",

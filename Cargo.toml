@@ -15,7 +15,7 @@ rfd = "0.15.2"
 rapier3d-urdf = { version = "0.3.0", features = ["stl"] }
 bincode = "1.3.3"
 openrr-planner = "0.1.0"
-urdf-rs = "0.6.9"
+urdf-rs = { version = "0.6.9", features = ["transmission"] }
 xurdf = "0.2.5"
 k = "0.29.1"
 
@@ -24,6 +24,7 @@ opt-level = 2
 
 [patch.crates-io]
 assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "6ea264f" }
+urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "4710127" }
 
 #[profile.dev]
 #opt-level = 1

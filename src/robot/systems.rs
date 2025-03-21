@@ -8,8 +8,10 @@ use bevy_rapier3d::rapier::data::Index;
 use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, RigidBodyAdditionalMassProps};
 use rapier3d_urdf::{UrdfJointHandle, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
-use std::ops::DerefMut;
+use std::ops::{BitOrAssign, DerefMut};
+use bevy_rapier3d::dynamics::JointAxesMask;
 use bevy_rapier3d::utils::iso_to_transform;
+use crate::math::Real;
 use crate::robot::*;
 use crate::ui::import::RobotImporting;
 
@@ -105,7 +107,7 @@ pub fn init_robots(
         // SAFETY: since the rapier context is accessed mutably, bevy restricts any other threads from
         //         accessing the context, so this should be safe
         let handles: UrdfRobotHandles<Option<Index>> = unsafe {
-            let urdf_robot = UrdfRobot::from_robot(
+            let mut urdf_robot = UrdfRobot::from_robot(
                 &urdf_rs_robot_to_xurdf(robot.urdf.clone()),
                 importing.urdf_loader_options.clone(),
                 robot.mesh_dir.clone()
@@ -113,6 +115,35 @@ pub fn init_robots(
                     .unwrap_or_else(|| Path::new("./").to_path_buf())
                     .as_path()
             );
+            for transmission in robot.urdf.transmissions.iter() {
+                if !transmission.transmission_type.contains("SimpleTransmission") {
+                    bevy::log::warn!(
+                        "Found transmission type other than SimpleTransmission, which isn't implemented yet.\
+                        Using SimpleTransmission implementation anyways.");
+                }
+                // TODO: make error struct to handle errors and display them in the app instead of crashing
+                let joint_name = transmission.joints.first()
+                    .map(|v| &v.name)
+                    .expect(format!("UrdfError: no joints in transmission {}", transmission.name).as_str());
+                let actuator = transmission.actuators.first().map(|v| &v.name)
+                    .expect(format!("UrdfError: no actuators in transmission {}", transmission.name).as_str());
+                let (joint, rapier_j) = robot.urdf.joints
+                    .iter()
+                    .zip(urdf_robot.joints.iter_mut())
+                    .find(|(j, _)| j.name.eq(joint_name))
+                    .map(|(j1, j2)| (j1, &mut j2.joint))
+                    .expect(format!("Can't find joint {0} in robot {1}", joint_name, robot.urdf.name).as_str());
+                rapier_j.motor_axes = !rapier_j.locked_axes;
+                for i in 0..6 {
+                    let curr_bit = 1 << i;
+                    if (rapier_j.motor_axes.bits() & curr_bit) != 0 {
+                        let motor = &mut rapier_j.motors[i];
+                        motor.max_force = joint.limit.effort as Real;
+                        motor.target_vel = joint.limit.velocity as Real;
+                    }
+                }
+            }
+
             match robot.robot_joint_type {
                 RobotJointType::ImpulseJoints => {
                     let handles = urdf_robot
