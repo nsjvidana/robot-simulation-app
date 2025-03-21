@@ -1,9 +1,16 @@
 use bevy::prelude::{Component, Entity, GlobalTransform};
 use bevy_rapier3d::geometry::ActiveHooks;
-use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, CollisionEvent, ContactForceEvent, Group};
-use bevy_rapier3d::rapier;
-use bevy_rapier3d::rapier::prelude::{CCDSolver, ColliderHandle, ColliderSet, DefaultBroadPhase, EventHandler, ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointHandle, MultibodyJointSet, NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyHandle, RigidBodySet};
 use bevy_rapier3d::na::{ArrayStorage, Matrix3, Vector, Vector3};
+use bevy_rapier3d::prelude::{
+    ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, CollisionEvent, ContactForceEvent,
+    Group,
+};
+use bevy_rapier3d::rapier;
+use bevy_rapier3d::rapier::prelude::{
+    CCDSolver, ColliderHandle, ColliderSet, DefaultBroadPhase, EventHandler, ImpulseJointHandle,
+    ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointHandle, MultibodyJointSet,
+    NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyHandle, RigidBodySet,
+};
 use std::collections::HashMap;
 
 pub trait IntoBevy {
@@ -16,14 +23,10 @@ impl IntoBevy for rapier::prelude::CoefficientCombineRule {
     type Target = CoefficientCombineRule;
     fn into_bevy(self) -> Self::Target {
         match self {
-            rapier::prelude::CoefficientCombineRule::Average =>
-                CoefficientCombineRule::Average,
-            rapier::prelude::CoefficientCombineRule::Min =>
-                CoefficientCombineRule::Min,
-            rapier::prelude::CoefficientCombineRule::Max =>
-                CoefficientCombineRule::Max,
-            rapier::prelude::CoefficientCombineRule::Multiply =>
-                CoefficientCombineRule::Multiply,
+            rapier::prelude::CoefficientCombineRule::Average => CoefficientCombineRule::Average,
+            rapier::prelude::CoefficientCombineRule::Min => CoefficientCombineRule::Min,
+            rapier::prelude::CoefficientCombineRule::Max => CoefficientCombineRule::Max,
+            rapier::prelude::CoefficientCombineRule::Multiply => CoefficientCombineRule::Multiply,
         }
     }
 }
@@ -82,16 +85,11 @@ impl IntoXurdf for urdf_rs::Geometry {
             Self::Box { size } => Geometry::Box {
                 size: Vector::from_data(ArrayStorage([size])),
             },
-            Self::Cylinder { radius, length } => Geometry::Cylinder {
-                radius,
-                length
-            },
-            Self::Sphere { radius } => Geometry::Sphere {
-                radius
-            },
-            Self::Mesh { filename, scale} => Geometry::Mesh {
+            Self::Cylinder { radius, length } => Geometry::Cylinder { radius, length },
+            Self::Sphere { radius } => Geometry::Sphere { radius },
+            Self::Mesh { filename, scale } => Geometry::Mesh {
                 filename,
-                scale: scale.map(|s| Vector::from_data(ArrayStorage([s])))
+                scale: scale.map(|s| Vector::from_data(ArrayStorage([s]))),
             },
             _ => unimplemented!(),
         }
@@ -107,10 +105,10 @@ impl IntoXurdf for urdf_rs::Inertial {
             origin: self.origin.into_xurdf(),
             inertia: Matrix3::from_data(ArrayStorage([
                 [inertia.ixx, inertia.ixy, inertia.ixz],
-                [0.         , inertia.iyy, inertia.iyz],
-                [0.         , 0.         , inertia.izz]
+                [0., inertia.iyy, inertia.iyz],
+                [0., 0., inertia.izz],
             ])),
-            mass: self.mass.value
+            mass: self.mass.value,
         }
     }
 }
@@ -165,23 +163,23 @@ pub fn urdf_rs_robot_to_xurdf(robot: urdf_rs::Robot) -> xurdf::Robot {
     for l in robot.links.into_iter() {
         links.push(xurdf::Link {
             name: l.name,
-            visuals: l.visual.into_iter()
-                .map(|v| {
-                    xurdf::Visual {
-                        name: v.name,
-                        origin: v.origin.into_xurdf(),
-                        geometry: v.geometry.into_xurdf(),
-                    }
+            visuals: l
+                .visual
+                .into_iter()
+                .map(|v| xurdf::Visual {
+                    name: v.name,
+                    origin: v.origin.into_xurdf(),
+                    geometry: v.geometry.into_xurdf(),
                 })
                 .collect(),
             inertial: l.inertial.into_xurdf(),
-            collisions: l.collision.into_iter()
-                .map(|co| {
-                    xurdf::Collision {
-                        name: co.name,
-                        origin: co.origin.into_xurdf(),
-                        geometry: co.geometry.into_xurdf(),
-                    }
+            collisions: l
+                .collision
+                .into_iter()
+                .map(|co| xurdf::Collision {
+                    name: co.name,
+                    origin: co.origin.into_xurdf(),
+                    geometry: co.geometry.into_xurdf(),
                 })
                 .collect(),
         })

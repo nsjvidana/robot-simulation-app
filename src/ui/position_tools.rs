@@ -1,4 +1,5 @@
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
+use crate::ui::ribbon::finish_ui_section_vertical;
 use crate::ui::simulation::PhysicsSimulation;
 use crate::ui::{PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
 use bevy::color::Color;
@@ -7,11 +8,10 @@ use bevy::prelude::{Gizmos, GlobalTransform, Isometry3d, Mat3, Quat, Query, Reso
 use bevy::utils::default;
 use bevy_egui::egui;
 use bevy_egui::egui::Ui;
-use bevy_rapier3d::parry::query::RayCast;
-use bevy_rapier3d::parry::shape::{Cuboid, Cylinder, };
-use bevy_rapier3d::rapier::prelude::Ray;
 use bevy_rapier3d::na::{Isometry3, Rotation3, UnitQuaternion, UnitVector3, Vector3};
-use crate::ui::ribbon::finish_ui_section_vertical;
+use bevy_rapier3d::parry::query::RayCast;
+use bevy_rapier3d::parry::shape::{Cuboid, Cylinder};
+use bevy_rapier3d::rapier::prelude::Ray;
 
 /// Contains all the data needed for the Posiion section of the Ribbon
 #[derive(Resource)]
@@ -93,8 +93,7 @@ pub fn position_tools_ui(
                     init_pointer_pos: None,
                     curr_pointer_pos: None,
                 }
-            }
-            else if rotate && rotate_clicked {
+            } else if rotate && rotate_clicked {
                 position_tools.selected_tool = PositionTool::Rotate {
                     grabbed_disc_normal: None,
                     init_pointer_pos: None,
@@ -109,12 +108,14 @@ pub fn position_tools_ui(
             let mut local = position_tools.local_coords;
             let local_clicked = ui.toggle_value(&mut local, "Local").clicked();
 
-            if global && global_clicked { position_tools.local_coords = false; }
-            else if local && local_clicked { position_tools.local_coords = true; }
+            if global && global_clicked {
+                position_tools.local_coords = false;
+            } else if local && local_clicked {
+                position_tools.local_coords = true;
+            }
         });
         finish_ui_section_vertical!(ui, "Position")
     });
-
 
     // Gizmos UI
     // Don't draw gizmos when sim is active.
@@ -128,17 +129,19 @@ pub fn position_tools_ui(
         let cam_pos = scene_window_data.camera_transform.translation();
         match position_tools.selected_tool {
             PositionTool::Grab { .. } => {
-                let [x_axis, y_axis, z_axis] =
-                    if position_tools.local_coords {
-                        [robot_rot * Vec3::X, robot_rot * Vec3::Y, robot_rot * Vec3::Z]
-                    }
-                    else {
-                        [Vec3::X, Vec3::Y, Vec3::Z]
-                    };
+                let [x_axis, y_axis, z_axis] = if position_tools.local_coords {
+                    [
+                        robot_rot * Vec3::X,
+                        robot_rot * Vec3::Y,
+                        robot_rot * Vec3::Z,
+                    ]
+                } else {
+                    [Vec3::X, Vec3::Y, Vec3::Z]
+                };
                 position_tools.gizmos_axes = Some([
                     UnitVector3::new_unchecked(x_axis.into()),
                     UnitVector3::new_unchecked(y_axis.into()),
-                    UnitVector3::new_unchecked(z_axis.into())
+                    UnitVector3::new_unchecked(z_axis.into()),
                 ]);
                 let cam_to_robot = robot_pos - cam_pos;
                 let orig = cam_pos + (cam_to_robot.normalize() * 10.);
@@ -149,19 +152,21 @@ pub fn position_tools_ui(
                 gizmos.arrow(orig, orig + x_axis, Color::linear_rgb(1., 0., 0.));
                 gizmos.arrow(orig, orig + y_axis, Color::linear_rgb(0., 1., 0.));
                 gizmos.arrow(orig, orig + z_axis, Color::linear_rgb(0., 0., 1.));
-            },
+            }
             PositionTool::Rotate { .. } => {
-                let [x_axis, y_axis, z_axis] =
-                    if position_tools.local_coords {
-                        [robot_rot * Vec3::X, robot_rot * Vec3::Y, robot_rot * Vec3::Z]
-                    }
-                    else {
-                        [Vec3::X, Vec3::Y, Vec3::Z]
-                    };
+                let [x_axis, y_axis, z_axis] = if position_tools.local_coords {
+                    [
+                        robot_rot * Vec3::X,
+                        robot_rot * Vec3::Y,
+                        robot_rot * Vec3::Z,
+                    ]
+                } else {
+                    [Vec3::X, Vec3::Y, Vec3::Z]
+                };
                 position_tools.gizmos_axes = Some([
                     UnitVector3::new_unchecked(x_axis.into()),
                     UnitVector3::new_unchecked(y_axis.into()),
-                    UnitVector3::new_unchecked(z_axis.into())
+                    UnitVector3::new_unchecked(z_axis.into()),
                 ]);
                 let cam_to_robot = robot_pos - cam_pos;
                 let orig = cam_pos + (cam_to_robot.normalize() * 10.);
@@ -173,16 +178,27 @@ pub fn position_tools_ui(
                     translation: orig.into(),
                     rotation: robot_rot,
                 };
-                iso.rotation = Quat::from_mat3(&Mat3 { x_axis:  z_axis, y_axis        , z_axis: -x_axis, });
+                iso.rotation = Quat::from_mat3(&Mat3 {
+                    x_axis: z_axis,
+                    y_axis,
+                    z_axis: -x_axis,
+                });
                 gizmos.circle(iso, 1., Color::linear_rgb(1., 0., 0.));
-                iso.rotation = Quat::from_mat3(&Mat3 { x_axis         , y_axis: z_axis, z_axis: -y_axis, });
+                iso.rotation = Quat::from_mat3(&Mat3 {
+                    x_axis,
+                    y_axis: z_axis,
+                    z_axis: -y_axis,
+                });
                 gizmos.circle(iso, 1., Color::linear_rgb(0., 1., 0.));
-                iso.rotation = Quat::from_mat3(&Mat3 { x_axis         , y_axis        , z_axis        , });
+                iso.rotation = Quat::from_mat3(&Mat3 {
+                    x_axis,
+                    y_axis,
+                    z_axis,
+                });
                 gizmos.circle(iso, 1., Color::linear_rgb(0., 0., 1.));
             }
         }
-    }
-    else {
+    } else {
         position_tools.gizmos_origin = None;
         position_tools.gizmos_axes = None;
     }
@@ -199,8 +215,7 @@ pub fn position_tools_functionality(
     mouse_pressed: bool,
     physics_sim: &PhysicsSimulation,
 ) {
-    if
-        scene_window_data.viewport_to_world_ray.is_none()
+    if scene_window_data.viewport_to_world_ray.is_none()
         || position_tools.gizmos_origin.is_none()
         || position_tools.gizmos_axes.is_none()
         || selected_entities.active_robot.is_none()
@@ -228,11 +243,14 @@ pub fn position_tools_functionality(
             if selected_entities.viewport_clicked {
                 let shape = position_tools.grab_shape;
                 let mut clicked_axes = [false, false, false];
-                let [x_axis, y_axis, z_axis] =
-                    [axes[0].into_inner(), axes[1].into_inner(), axes[2].into_inner()];
+                let [x_axis, y_axis, z_axis] = [
+                    axes[0].into_inner(),
+                    axes[1].into_inner(),
+                    axes[2].into_inner(),
+                ];
                 let mut iso = Isometry3 {
                     translation: (gizmos_origin.translation.vector + x_axis * 0.5).into(),
-                    rotation: UnitQuaternion::from_basis_unchecked(&[-y_axis, x_axis, z_axis])
+                    rotation: UnitQuaternion::from_basis_unchecked(&[-y_axis, x_axis, z_axis]),
                 };
                 clicked_axes[0] = shape.intersects_ray(&iso, &ray, Real::MAX);
                 iso.translation = (gizmos_origin.translation.vector + y_axis * 0.5).into();
@@ -244,17 +262,24 @@ pub fn position_tools_functionality(
                 if let Some(idx) = clicked_axes.iter().position(|b| *b) {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     *grabbed_axis = Some(axes[idx]);
-                    *plane_normal =
-                        if idx == 0 { Some(axes[2]) }
-                        else if idx == 1 || idx == 2 { Some(axes[0]) }
-                        else { unreachable!() };
+                    *plane_normal = if idx == 0 {
+                        Some(axes[2])
+                    } else if idx == 1 || idx == 2 {
+                        Some(axes[0])
+                    } else {
+                        unreachable!()
+                    };
 
                     // Save robot transform
                     position_tools.init_robot_transform = transform_q.get(robot).ok().copied();
                     // Computing plane intersection point
                     *init_pointer_pos = compute_intersection_pos(
                         &ray,
-                        &position_tools.init_robot_transform.unwrap().translation().into(),
+                        &position_tools
+                            .init_robot_transform
+                            .unwrap()
+                            .translation()
+                            .into(),
                         &plane_normal.unwrap(),
                     );
                 } else {
@@ -274,21 +299,21 @@ pub fn position_tools_functionality(
                         );
                     }
                 }
-                if let (
-                    Some(grabbed_axis),
-                    Some(init_pos),
-                    Some(curr_pos),
-                    Some(init_transform)
-                ) = (grabbed_axis, init_pointer_pos, curr_pointer_pos, position_tools.init_robot_transform)
-                {
+                if let (Some(grabbed_axis), Some(init_pos), Some(curr_pos), Some(init_transform)) = (
+                    grabbed_axis,
+                    init_pointer_pos,
+                    curr_pointer_pos,
+                    position_tools.init_robot_transform,
+                ) {
                     if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
                         let disp = (*curr_pos - *init_pos).dot(grabbed_axis);
                         let axis: Vec3 = grabbed_axis.into_inner().into();
                         *robot_transform = Transform {
                             translation: init_transform.translation() + axis * disp,
                             rotation: init_transform.rotation(),
-                            scale: Vec3::ONE
-                        }.into();
+                            scale: Vec3::ONE,
+                        }
+                        .into();
                     }
                 }
             }
@@ -302,7 +327,7 @@ pub fn position_tools_functionality(
                 *curr_pointer_pos = None;
                 // TODO: register Undo action
             }
-        },
+        }
         PositionTool::Rotate {
             ref mut grabbed_disc_normal,
             ref mut init_pointer_pos,
@@ -319,11 +344,14 @@ pub fn position_tools_functionality(
                 let inner = position_tools.rotate_shape_inner;
                 let outer = position_tools.rotate_shape_outer;
                 iso.rotation = Rotation3::from_basis_unchecked(&[-y_axis, x_axis, z_axis]).into();
-                clicked_axes[0] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
+                clicked_axes[0] = !inner.intersects_ray(&iso, &ray, Real::MAX)
+                    && outer.intersects_ray(&iso, &ray, Real::MAX);
                 iso.rotation = Rotation3::from_basis_unchecked(&[x_axis, y_axis, z_axis]).into();
-                clicked_axes[1] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
+                clicked_axes[1] = !inner.intersects_ray(&iso, &ray, Real::MAX)
+                    && outer.intersects_ray(&iso, &ray, Real::MAX);
                 iso.rotation = Rotation3::from_basis_unchecked(&[x_axis, z_axis, -y_axis]).into();
-                clicked_axes[2] = !inner.intersects_ray(&iso, &ray, Real::MAX) && outer.intersects_ray(&iso, &ray, Real::MAX);
+                clicked_axes[2] = !inner.intersects_ray(&iso, &ray, Real::MAX)
+                    && outer.intersects_ray(&iso, &ray, Real::MAX);
 
                 if let Some(idx) = clicked_axes.iter().position(|b| *b) {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
@@ -334,14 +362,17 @@ pub fn position_tools_functionality(
                     // Computing plane intersection point
                     *init_pointer_pos = compute_intersection_pos(
                         &ray,
-                        &position_tools.init_robot_transform.unwrap().translation().into(),
+                        &position_tools
+                            .init_robot_transform
+                            .unwrap()
+                            .translation()
+                            .into(),
                         &axes[idx],
                     );
                 } else {
                     *grabbed_disc_normal = None;
                 }
-            }
-            else if mouse_pressed {
+            } else if mouse_pressed {
                 if let Some(normal) = grabbed_disc_normal {
                     selected_entities.pointer_usage_state = PointerUsageState::UsingTool;
                     if let Some(init_transform) = position_tools.init_robot_transform {
@@ -354,20 +385,27 @@ pub fn position_tools_functionality(
                             if let Ok(mut robot_transform) = transform_q.get_mut(robot) {
                                 let robot_translation = robot_transform.translation();
                                 let (init, curr): (Vec3, Vec3) = ((*init).into(), (*curr).into());
-                                let (init_loc, curr_loc) = ((init - robot_translation), (curr - robot_translation));
+                                let (init_loc, curr_loc) =
+                                    ((init - robot_translation), (curr - robot_translation));
                                 let angle = init_loc.angle_between(curr_loc);
-                                let angle_dir = init_loc.cross(curr_loc).dot(normal.into_inner().into()).signum();
+                                let angle_dir = init_loc
+                                    .cross(curr_loc)
+                                    .dot(normal.into_inner().into())
+                                    .signum();
                                 *robot_transform = Transform {
                                     translation: init_transform.translation(),
-                                    rotation: Quat::from_axis_angle((*normal).into(), angle * angle_dir) * init_transform.rotation(),
-                                    scale: Vec3::ONE
-                                }.into();
+                                    rotation: Quat::from_axis_angle(
+                                        (*normal).into(),
+                                        angle * angle_dir,
+                                    ) * init_transform.rotation(),
+                                    scale: Vec3::ONE,
+                                }
+                                .into();
                             }
                         }
                     }
                 }
-            }
-            else if mouse_just_released {
+            } else if mouse_just_released {
                 position_tools.init_robot_transform = None;
                 *grabbed_disc_normal = None;
                 *init_pointer_pos = None;
@@ -380,15 +418,16 @@ pub fn position_tools_functionality(
 pub fn compute_intersection_pos(
     ray: &Ray,
     plane_pos: &Vector3<Real>,
-    plane_normal: &UnitVector3<Real>
+    plane_normal: &UnitVector3<Real>,
 ) -> Option<Vector3<Real>> {
     let scale = ray_scale_for_plane_intersect_local(
         &plane_normal,
         &(ray.origin.coords - plane_pos),
-        &ray.dir
+        &ray.dir,
     );
     if let Some(scale) = scale {
-        if scale >= 0. { // Ensure the intersection isn't behind the camera
+        if scale >= 0. {
+            // Ensure the intersection isn't behind the camera
             return Some(ray.origin.coords + ray.dir * scale);
         }
     }

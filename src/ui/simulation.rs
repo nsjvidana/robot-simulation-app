@@ -1,13 +1,13 @@
 use crate::robot::RobotSet;
+use crate::ui::ribbon::finish_ui_section_vertical;
 use crate::ui::RobotLabUiAssets;
 use bevy::prelude::{Commands, Query, ResMut, Resource, With};
 use bevy::utils::default;
+use bevy_egui::egui;
 use bevy_egui::egui::load::SizedTexture;
 use bevy_egui::egui::{Button, Ui};
-use bevy_egui::egui;
 use bevy_rapier3d::plugin::{DefaultRapierContext, RapierConfiguration, RapierContext};
 use std::ops::DerefMut;
-use crate::ui::ribbon::finish_ui_section_vertical;
 
 /// Contains the data needed for the physics simulation window
 #[derive(Resource)]
@@ -48,7 +48,7 @@ pub enum SnapshotAction {
     Load,
     Save,
     #[default]
-    None
+    None,
 }
 
 #[derive(Default)]
@@ -60,13 +60,12 @@ pub struct SimulationSnapshot {
 pub fn simulation_ribbon_ui(
     ui: &mut Ui,
     physics_sim: &mut PhysicsSimulation,
-    ui_assets: &RobotLabUiAssets
+    ui_assets: &RobotLabUiAssets,
 ) -> (egui::Rect, &'static str) {
     let resp = ui.vertical(|ui| {
         let btn = ui.add(
-            Button::image(
-                SizedTexture::new(ui_assets.new_window_img, [64.0, 64.0])
-            ).fill(egui::Color32::TRANSPARENT)
+            Button::image(SizedTexture::new(ui_assets.new_window_img, [64.0, 64.0]))
+                .fill(egui::Color32::TRANSPARENT),
         );
         ui.label("Run Simulation");
         if btn.clicked() {
@@ -85,16 +84,23 @@ pub fn simulation_control_window(
     egui::Window::new("Simulation")
         .open(&mut window_open)
         .show(egui_ctx, |ui| {
-            let play_toggle_clicked = ui.button(if physics_sim.physics_active {"Pause"} else {"Play"}).clicked();
+            let play_toggle_clicked = ui
+                .button(if physics_sim.physics_active {
+                    "Pause"
+                } else {
+                    "Play"
+                })
+                .clicked();
             let step_clicked = ui.button("Step").clicked();
             let reset_clicked = ui.button("Reset").clicked();
 
-            if play_toggle_clicked { physics_sim.physics_active = !physics_sim.physics_active }
+            if play_toggle_clicked {
+                physics_sim.physics_active = !physics_sim.physics_active
+            }
             physics_sim.step_sim = step_clicked;
             if reset_clicked {
                 physics_sim.reset_simulation();
-            }
-            else if physics_sim.physics_active || physics_sim.step_sim {
+            } else if physics_sim.physics_active || physics_sim.step_sim {
                 if physics_sim.sim_resetted {
                     physics_sim.snapshot_action = SnapshotAction::Save;
                 }
@@ -108,13 +114,13 @@ pub fn simulation_control_window(
 
 /// The system that lets the physics simulation window control the rapier simulation.
 pub fn control_simulation(
-   mut commands: Commands,
-   mut rapier_config_q: Query<
-       (&mut RapierConfiguration, &mut RapierContext),
-       With<DefaultRapierContext>
-   >,
-   mut physics_sim: ResMut<PhysicsSimulation>,
-   mut robot_set: ResMut<RobotSet>
+    mut commands: Commands,
+    mut rapier_config_q: Query<
+        (&mut RapierConfiguration, &mut RapierContext),
+        With<DefaultRapierContext>,
+    >,
+    mut physics_sim: ResMut<PhysicsSimulation>,
+    mut robot_set: ResMut<RobotSet>,
 ) {
     let (mut config, mut rapier_context) = rapier_config_q.single_mut();
 
@@ -122,18 +128,21 @@ pub fn control_simulation(
     match physics_sim.snapshot_action {
         SnapshotAction::Load => {
             let snapshot = &physics_sim.snapshot;
-            let resetted_ctx = bincode::deserialize::<RapierContext>(&snapshot.rapier_context).unwrap();
+            let resetted_ctx =
+                bincode::deserialize::<RapierContext>(&snapshot.rapier_context).unwrap();
             let _ = std::mem::replace(rapier_context.deref_mut(), resetted_ctx);
             // Reset robot transforms
             let resetted_robot_set = bincode::deserialize::<RobotSet>(&snapshot.robot_set).unwrap();
             for robot_data in resetted_robot_set.robots.iter().map(|v| v.1) {
-                commands.entity(robot_data.robot_entity).insert(robot_data.transform);
+                commands
+                    .entity(robot_data.robot_entity)
+                    .insert(robot_data.transform);
             }
-        },
+        }
         SnapshotAction::Save => {
             physics_sim.snapshot = SimulationSnapshot {
                 rapier_context: bincode::serialize(&*rapier_context).unwrap(),
-                robot_set: bincode::serialize(&*robot_set).unwrap()
+                robot_set: bincode::serialize(&*robot_set).unwrap(),
             }
         }
         SnapshotAction::None => {}
@@ -146,12 +155,15 @@ pub fn control_simulation(
         if physics_sim.step_sim {
             physics_sim.physics_active = false;
             config.physics_pipeline_active = false;
-        }
-        else { config.physics_pipeline_active = true; } // If step not pressed, let the sim play.
-    }
-    else {
+        } else {
+            config.physics_pipeline_active = true;
+        } // If step not pressed, let the sim play.
+    } else {
         // If the sim is paused, only run it for one frame when the "Step" button is pressed.
-        if physics_sim.step_sim { config.physics_pipeline_active = true; }
-        else { config.physics_pipeline_active = false; }
+        if physics_sim.step_sim {
+            config.physics_pipeline_active = true;
+        } else {
+            config.physics_pipeline_active = false;
+        }
     }
 }

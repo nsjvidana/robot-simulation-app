@@ -1,21 +1,30 @@
-use std::ops::Mul;
-use bevy::prelude::{Commands, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
-use bevy_egui::EguiContexts;
-use bevy_egui::egui::{Align, Color32, Layout, Rgba, Ui, UiBuilder};
 use crate::ui::import::{import_ui, RobotImporting};
+use crate::ui::motion_planning::{
+    ik_window, ik_window_function, motion_planning_ui, MotionPlanning,
+};
 use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
-use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
-use crate::ui::motion_planning::{ik_window, motion_planning_ui, ik_window_function, MotionPlanning};
-use bevy_egui::egui as egui;
+use crate::ui::{
+    PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup,
+};
 use bevy::input::ButtonInput;
-use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle};
+use bevy::prelude::{
+    Commands, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut,
+    Resource, With,
+};
+use bevy_egui::egui;
+use bevy_egui::egui::{Align, Color32, Layout, Rgba, Ui, UiBuilder};
+use bevy_egui::EguiContexts;
+use bevy_rapier3d::dynamics::{
+    ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle,
+};
 use bevy_rapier3d::plugin::RapierContext;
 use bevy_rapier3d::prelude::ReadDefaultRapierContext;
+use std::ops::Mul;
 
 #[derive(Default, Resource)]
 pub struct Ribbon {
-    tab: RibbonTab
+    tab: RibbonTab,
 }
 
 #[derive(Default, PartialEq)]
@@ -31,7 +40,7 @@ macro_rules! finish_ui_section_vertical {
     ($ui:expr, $label_name:expr) => {{
         egui::Label::new("").layout_in_ui($ui);
         ($ui.min_rect(), $label_name)
-    }}
+    }};
 }
 
 pub(crate) use finish_ui_section_vertical;
@@ -56,23 +65,33 @@ pub fn ribbon_ui(
         macro_rules! ribbon_btn {
             ($txt:expr, $tab_enum:expr) => {
                 egui::Button::new($txt).fill({
-                    let c = Rgba::from(Color32::DARK_GRAY).multiply(
-                        if ribbon.tab == $tab_enum { 1. }
-                        else { 0.25 }
-                    );
+                    let c = Rgba::from(Color32::DARK_GRAY).multiply(if ribbon.tab == $tab_enum {
+                        1.
+                    } else {
+                        0.25
+                    });
                     Color32::from(Rgba::from_rgb(c[0], c[1], c[2]))
                 })
             };
         }
-        let tabs_rect = ui.horizontal(|ui| {
-            let general = ui.add(ribbon_btn!("General", RibbonTab::General)).clicked();
-            let motion_planning = ui.add(ribbon_btn!("Motion Planning", RibbonTab::MotionPlanning)).clicked();
-            let fluids = ui.add(ribbon_btn!("Fluids", RibbonTab::Fluids)).clicked();
-            if general { ribbon.tab = RibbonTab::General }
-            else if motion_planning { ribbon.tab = RibbonTab::MotionPlanning; }
-            else if fluids { ribbon.tab = RibbonTab::Fluids; bevy::log::warn!("Fluids tab isn't implemented yet!"); }
-            ui.min_rect()
-        }).inner;
+        let tabs_rect = ui
+            .horizontal(|ui| {
+                let general = ui.add(ribbon_btn!("General", RibbonTab::General)).clicked();
+                let motion_planning = ui
+                    .add(ribbon_btn!("Motion Planning", RibbonTab::MotionPlanning))
+                    .clicked();
+                let fluids = ui.add(ribbon_btn!("Fluids", RibbonTab::Fluids)).clicked();
+                if general {
+                    ribbon.tab = RibbonTab::General
+                } else if motion_planning {
+                    ribbon.tab = RibbonTab::MotionPlanning;
+                } else if fluids {
+                    ribbon.tab = RibbonTab::Fluids;
+                    bevy::log::warn!("Fluids tab isn't implemented yet!");
+                }
+                ui.min_rect()
+            })
+            .inner;
         let ribbon_height = ui.max_rect().height() - tabs_rect.height();
         match ribbon.tab {
             RibbonTab::General => {
@@ -87,15 +106,15 @@ pub fn ribbon_ui(
                     &mut gizmos,
                     &mut physics_sim,
                     &ui_assets,
-                    ribbon_height
+                    ribbon_height,
                 );
-            },
+            }
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
                     ui,
                     &mut selected_entities,
                     &mut motion_planning,
-                    ribbon_height
+                    ribbon_height,
                 );
             }
             _ => {}
@@ -106,7 +125,7 @@ pub fn ribbon_ui(
     match ribbon.tab {
         RibbonTab::General => {
             simulation_control_window(ctxs.ctx_mut(), &mut physics_sim);
-        },
+        }
         RibbonTab::MotionPlanning => {
             ik_window(ctxs.ctx_mut(), &mut motion_planning);
         }
@@ -115,8 +134,7 @@ pub fn ribbon_ui(
 
     if ctxs.ctx_mut().is_using_pointer() {
         selected_entities.pointer_usage_state = PointerUsageState::UiUsingPointer;
-    }
-    else {
+    } else {
         selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
     }
 }
@@ -127,18 +145,15 @@ macro_rules! finish_ribbon_tab {
         $ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
             for (mut rect, section_name) in $rects {
                 rect.max.y = ui.max_rect().max.y;
-                ui.allocate_new_ui(
-                    UiBuilder::new().max_rect(rect),
-                    |ui| ui.label(section_name)
-                );
+                ui.allocate_new_ui(UiBuilder::new().max_rect(rect), |ui| ui.label(section_name));
             }
         });
     };
 }
 
-pub(crate) use finish_ribbon_tab;
 use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
+pub(crate) use finish_ribbon_tab;
 
 fn general_tab(
     ui: &mut Ui,
@@ -155,33 +170,19 @@ fn general_tab(
 ) {
     let mut rects = Vec::new();
     ui.horizontal(|ui| {
-        rects.push(
-            import_ui(
-                commands,
-                ui,
-                robot_importing,
-            )
-        );
+        rects.push(import_ui(commands, ui, robot_importing));
         ui.add(egui::Separator::default().grow(ribbon_height));
-        rects.push(
-            position_tools_ui(
-                ui,
-                position_tools,
-                selected_entities,
-                scene_window_data,
-                transform_q,
-                gizmos,
-                physics_sim
-            )
-        );
+        rects.push(position_tools_ui(
+            ui,
+            position_tools,
+            selected_entities,
+            scene_window_data,
+            transform_q,
+            gizmos,
+            physics_sim,
+        ));
         ui.add(egui::Separator::default().grow(ribbon_height));
-        rects.push(
-            simulation_ribbon_ui(
-                ui,
-                physics_sim,
-                &ui_assets
-            )
-        );
+        rects.push(simulation_ribbon_ui(ui, physics_sim, &ui_assets));
         ui.add(egui::Separator::default().grow(ribbon_height));
     });
 
@@ -199,8 +200,15 @@ pub fn ribbon_functionality(
 
     robot_q: Query<(&Robot, &RapierRobotHandles)>,
     joint_q: Query<
-        (Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>, Option<&KinematicNode>),
-        Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>)>
+        (
+            Option<&RapierImpulseJointHandle>,
+            Option<&RapierMultibodyJointHandle>,
+            Option<&KinematicNode>,
+        ),
+        Or<(
+            With<RapierImpulseJointHandle>,
+            With<RapierMultibodyJointHandle>,
+        )>,
     >,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
@@ -215,9 +223,9 @@ pub fn ribbon_functionality(
                 &mut transform_q,
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
-                &physics_sim
+                &physics_sim,
             );
-        },
+        }
         RibbonTab::MotionPlanning => {
             ik_window_function(
                 &mut commands,
@@ -226,7 +234,7 @@ pub fn ribbon_functionality(
                 &robot_q,
                 &joint_q,
             );
-        },
+        }
         _ => {}
     }
 }

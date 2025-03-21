@@ -1,11 +1,11 @@
-use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
+use crate::prelude::urdf_rs_robot_to_xurdf;
 use bevy::app::App;
 use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
-use crate::prelude::urdf_rs_robot_to_xurdf;
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
 
 pub mod systems;
 
@@ -27,7 +27,7 @@ pub struct RobotSet {
 pub struct RobotSerData {
     pub robot_entity: Entity,
     pub entities: RobotEntities,
-    pub transform: GlobalTransform
+    pub transform: GlobalTransform,
 }
 
 #[derive(Component)]

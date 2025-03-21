@@ -1,4 +1,7 @@
-use std::fmt::Display;
+use crate::convert::urdf_rs_robot_to_xurdf;
+use crate::robot::Robot;
+use crate::transparent_button;
+use crate::ui::ribbon::finish_ui_section_vertical;
 use bevy::core::Name;
 use bevy::prelude::{Commands, Resource};
 use bevy::utils::default;
@@ -6,10 +9,7 @@ use bevy_egui::egui;
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use crate::convert::urdf_rs_robot_to_xurdf;
-use crate::robot::Robot;
-use crate::transparent_button;
-use crate::ui::ribbon::finish_ui_section_vertical;
+use std::fmt::Display;
 
 #[derive(Resource)]
 pub struct RobotImporting {
@@ -39,7 +39,7 @@ impl Default for RobotImporting {
 pub enum ImportJointType {
     #[default]
     Impulse,
-    Multibody
+    Multibody,
 }
 
 pub fn import_ui(
@@ -51,16 +51,25 @@ pub fn import_ui(
         // "Make roots fixed" checkbox
         let _checkbox = ui.checkbox(
             &mut importing.urdf_loader_options.make_roots_fixed,
-            "Make roots fixed"
+            "Make roots fixed",
         );
         // Robot joint type
         ComboBox::from_label("Robot joint type")
             .selected_text(match importing.import_joint_type {
-                ImportJointType::Impulse => "Impulse", ImportJointType::Multibody => "Multibody"
+                ImportJointType::Impulse => "Impulse",
+                ImportJointType::Multibody => "Multibody",
             })
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut importing.import_joint_type, ImportJointType::Impulse, "Impulse");
-                ui.selectable_value(&mut importing.import_joint_type, ImportJointType::Multibody, "Multibody");
+                ui.selectable_value(
+                    &mut importing.import_joint_type,
+                    ImportJointType::Impulse,
+                    "Impulse",
+                );
+                ui.selectable_value(
+                    &mut importing.import_joint_type,
+                    ImportJointType::Multibody,
+                    "Multibody",
+                );
             });
 
         // Import urdf robot via file dialog
@@ -70,18 +79,21 @@ pub fn import_ui(
                 .add_filter("Robot Description", &["urdf", "URDF"])
                 .pick_file();
             if let Some(path) = dialog {
-                let robot_name = path.file_stem().unwrap()
-                    .to_str().unwrap().to_string();
+                let robot_name = path.file_stem().unwrap().to_str().unwrap().to_string();
                 let read_result = urdf_rs::read_file(&path);
-                if read_result.is_err() { panic!("{:?}", read_result.unwrap_err()); }
+                if read_result.is_err() {
+                    panic!("{:?}", read_result.unwrap_err());
+                }
 
                 let robot_cmp = Robot::new(read_result.unwrap(), path.clone(), None);
                 commands.spawn((
                     match importing.import_joint_type {
                         ImportJointType::Impulse => robot_cmp.with_impulse_joints(),
-                        ImportJointType::Multibody => robot_cmp.with_multibody_joints(importing.mb_loader_options),
+                        ImportJointType::Multibody => {
+                            robot_cmp.with_multibody_joints(importing.mb_loader_options)
+                        }
                     },
-                    Name::new(robot_name)
+                    Name::new(robot_name),
                 ));
             }
         }
