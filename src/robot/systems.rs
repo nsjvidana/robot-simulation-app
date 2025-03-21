@@ -8,9 +8,12 @@ use bevy_rapier3d::rapier::data::Index;
 use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, RigidBodyAdditionalMassProps};
 use rapier3d_urdf::{UrdfJointHandle, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
-use std::ops::DerefMut;
+use std::ops::{BitOrAssign, DerefMut};
+use bevy_rapier3d::dynamics::JointAxesMask;
 use bevy_rapier3d::utils::iso_to_transform;
+use crate::math::Real;
 use crate::robot::*;
+use crate::ui::import::RobotImporting;
 
 macro_rules! rapier_collider_to_components {
     ($coll:expr, $coll_handle:expr, $context_link:expr) => {
@@ -80,6 +83,7 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
+    importing: Res<RobotImporting>,
     mut robot_q: Query<
         (Entity, &mut Robot, Option<&RapierContextEntityLink>, Option<&GlobalTransform>),
         Without<RobotHandle>
@@ -103,9 +107,46 @@ pub fn init_robots(
         // SAFETY: since the rapier context is accessed mutably, bevy restricts any other threads from
         //         accessing the context, so this should be safe
         let handles: UrdfRobotHandles<Option<Index>> = unsafe {
+            let mut urdf_robot = UrdfRobot::from_robot(
+                &urdf_rs_robot_to_xurdf(robot.urdf.clone()),
+                importing.urdf_loader_options.clone(),
+                robot.mesh_dir.clone()
+                    .or_else(|| robot.robot_file_path.parent().map(|v| v.to_path_buf()))
+                    .unwrap_or_else(|| Path::new("./").to_path_buf())
+                    .as_path()
+            );
+            for transmission in robot.urdf.transmissions.iter() {
+                if !transmission.transmission_type.contains("SimpleTransmission") {
+                    bevy::log::warn!(
+                        "Found transmission type other than SimpleTransmission, which isn't implemented yet.\
+                        Using SimpleTransmission implementation anyways.");
+                }
+                // TODO: make error struct to handle errors and display them in the app instead of crashing
+                let joint_name = transmission.joints.first()
+                    .map(|v| &v.name)
+                    .expect(format!("UrdfError: no joints in transmission {}", transmission.name).as_str());
+                let actuator = transmission.actuators.first().map(|v| &v.name)
+                    .expect(format!("UrdfError: no actuators in transmission {}", transmission.name).as_str());
+                let (joint, rapier_j) = robot.urdf.joints
+                    .iter()
+                    .zip(urdf_robot.joints.iter_mut())
+                    .find(|(j, _)| j.name.eq(joint_name))
+                    .map(|(j1, j2)| (j1, &mut j2.joint))
+                    .expect(format!("Can't find joint {0} in robot {1}", joint_name, robot.urdf.name).as_str());
+                rapier_j.motor_axes = !rapier_j.locked_axes;
+                for i in 0..6 {
+                    let curr_bit = 1 << i;
+                    if (rapier_j.motor_axes.bits() & curr_bit) != 0 {
+                        let motor = &mut rapier_j.motors[i];
+                        motor.max_force = joint.limit.effort as Real;
+                        motor.target_vel = joint.limit.velocity as Real;
+                    }
+                }
+            }
+
             match robot.robot_joint_type {
                 RobotJointType::ImpulseJoints => {
-                    let handles = robot.rapier_urdf_robot.take().unwrap()
+                    let handles = urdf_robot
                         .insert_using_impulse_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,
@@ -124,7 +165,7 @@ pub fn init_robots(
                     }
                 },
                 RobotJointType::MultibodyJoints(options) => {
-                    let handles = robot.rapier_urdf_robot.take().unwrap()
+                    let handles = urdf_robot
                         .insert_using_multibody_joints(
                             &mut unsafe_ctx.deref_mut().bodies,
                             &mut unsafe_ctx.deref_mut().colliders,
@@ -263,7 +304,10 @@ pub fn init_robots(
             transform: transform.map_or_else(|| GlobalTransform::default(), |v| *v),
         });
         commands.entity(robot_entity)
-            .insert(RobotHandle(robot_idx))
+            .insert((
+                RobotHandle(robot_idx),
+                RapierRobotHandles(handles)
+            ))
             .insert_if_new(Transform::default());
     }
 }

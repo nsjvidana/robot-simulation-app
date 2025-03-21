@@ -6,8 +6,10 @@ use bevy_egui::egui;
 use bevy_egui::egui::{ComboBox, Ui};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
+use crate::convert::urdf_rs_robot_to_xurdf;
 use crate::robot::Robot;
-use crate::{finish_ui_section_vertical, transparent_button};
+use crate::transparent_button;
+use crate::ui::ribbon::finish_ui_section_vertical;
 
 #[derive(Resource)]
 pub struct RobotImporting {
@@ -70,12 +72,10 @@ pub fn import_ui(
             if let Some(path) = dialog {
                 let robot_name = path.file_stem().unwrap()
                     .to_str().unwrap().to_string();
-                let (robot, _) = rapier3d_urdf::UrdfRobot::from_file(
-                    &path,
-                    importing.urdf_loader_options.clone(),
-                    None
-                ).unwrap();
-                let robot_cmp = Robot::new(robot, path);
+                let read_result = urdf_rs::read_file(&path);
+                if read_result.is_err() { panic!("{:?}", read_result.unwrap_err()); }
+
+                let robot_cmp = Robot::new(read_result.unwrap(), path.clone(), None);
                 commands.spawn((
                     match importing.import_joint_type {
                         ImportJointType::Impulse => robot_cmp.with_impulse_joints(),

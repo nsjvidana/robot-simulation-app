@@ -1,8 +1,11 @@
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
 use bevy::app::App;
 use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
 use bevy_rapier3d::rapier::data::{Arena, Index};
-use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot};
+use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
+use crate::convert::urdf_rs_robot_to_xurdf;
 
 pub mod systems;
 
@@ -29,15 +32,19 @@ pub struct RobotSerData {
 
 #[derive(Component)]
 pub struct Robot {
-    pub(crate) rapier_urdf_robot: Option<UrdfRobot>,
-    pub(crate) robot_joint_type: RobotJointType,
+    pub urdf: urdf_rs::Robot,
+    pub mesh_dir: Option<PathBuf>,
+    pub robot_joint_type: RobotJointType,
+    pub robot_file_path: PathBuf,
 }
 
 impl Robot {
-    pub fn new(robot: UrdfRobot) -> Self {
+    pub fn new(robot: urdf_rs::Robot, path: PathBuf, mesh_dir: Option<PathBuf>) -> Self {
         Self {
-            rapier_urdf_robot: Some(robot),
+            urdf: robot,
+            mesh_dir,
             robot_joint_type: RobotJointType::ImpulseJoints,
+            robot_file_path: path,
         }
     }
 
@@ -49,6 +56,22 @@ impl Robot {
     pub fn with_multibody_joints(mut self, joint_options: UrdfMultibodyOptions) -> Self {
         self.robot_joint_type = RobotJointType::MultibodyJoints(joint_options);
         self
+    }
+}
+
+#[derive(Component)]
+pub struct RapierRobotHandles(pub(crate) UrdfRobotHandles<Option<Index>>);
+
+impl Deref for RapierRobotHandles {
+    type Target = UrdfRobotHandles<Option<Index>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RapierRobotHandles {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

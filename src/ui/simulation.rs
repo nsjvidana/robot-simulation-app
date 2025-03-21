@@ -7,7 +7,7 @@ use bevy_egui::egui::{Button, Ui};
 use bevy_egui::egui;
 use bevy_rapier3d::plugin::{DefaultRapierContext, RapierConfiguration, RapierContext};
 use std::ops::DerefMut;
-use crate::finish_ui_section_vertical;
+use crate::ui::ribbon::finish_ui_section_vertical;
 
 /// Contains the data needed for the physics simulation window
 #[derive(Resource)]
