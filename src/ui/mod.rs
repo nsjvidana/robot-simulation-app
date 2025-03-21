@@ -1,12 +1,12 @@
 pub mod position_tools;
 pub mod import;
-mod simulation;
-mod ribbon;
-mod motion_planning;
+pub mod simulation;
+pub mod ribbon;
+pub mod motion_planning;
 
+use crate::prelude::*;
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
-use crate::math::{ray_scale_for_plane_intersect_local, Real};
-use crate::robot::{Robot, RobotJointType, RobotPart, RobotSet};
+use crate::math::ray_scale_for_plane_intersect_local;
 use bevy::app::App;
 use bevy::gizmos::AppGizmoBuilder;
 use bevy::asset::Handle;

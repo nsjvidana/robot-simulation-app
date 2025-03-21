@@ -18,6 +18,10 @@ openrr-planner = "0.1.0"
 urdf-rs = { version = "0.6.9", features = ["transmission"] }
 xurdf = "0.2.5"
 k = "0.29.1"
+thiserror = "1"
+
+[dev-dependencies]
+anyhow = "1"
 
 [profile.dev.package."*"]
 opt-level = 2

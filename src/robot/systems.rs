@@ -9,10 +9,10 @@ use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, R
 use rapier3d_urdf::{UrdfJointHandle, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use std::cell::UnsafeCell;
 use std::ops::{BitOrAssign, DerefMut};
+use std::path::Path;
 use bevy_rapier3d::dynamics::JointAxesMask;
 use bevy_rapier3d::utils::iso_to_transform;
-use crate::math::Real;
-use crate::robot::*;
+use crate::prelude::*;
 use crate::ui::import::RobotImporting;
 
 macro_rules! rapier_collider_to_components {

@@ -6,12 +6,12 @@ use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
 use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
+use crate::ui::motion_planning::{ik_window, motion_planning_ui, ik_window_function, MotionPlanning};
 use bevy_egui::egui as egui;
 use bevy::input::ButtonInput;
 use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle};
 use bevy_rapier3d::plugin::RapierContext;
 use bevy_rapier3d::prelude::ReadDefaultRapierContext;
-use crate::ui::motion_planning::{ik_window, motion_planning_ui, ik_window_function, MotionPlanning};
 
 #[derive(Default, Resource)]
 pub struct Ribbon {
@@ -48,7 +48,6 @@ pub fn ribbon_ui(
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
-    robot_part_q: Query<&RobotPart>,
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     // Ribbon

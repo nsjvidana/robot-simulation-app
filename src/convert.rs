@@ -117,7 +117,7 @@ impl IntoXurdf for urdf_rs::Inertial {
 
 #[allow(unused_variables, dead_code)]
 #[derive(Component)]
-pub struct RapierContext {
+pub(crate) struct RapierContext {
     /// The island manager, which detects what object is sleeping
     /// (not moving much) to reduce computations.
     pub islands: IslandManager,

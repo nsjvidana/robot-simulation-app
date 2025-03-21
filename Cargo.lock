@@ -4588,6 +4588,7 @@ dependencies = [
 name = "robot-simulation-app"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bevy",
  "bevy-inspector-egui",
  "bevy_egui",
@@ -4600,6 +4601,7 @@ dependencies = [
  "rapier3d-urdf",
  "rfd",
  "serde",
+ "thiserror 1.0.69",
  "urdf-rs",
  "xurdf",
 ]

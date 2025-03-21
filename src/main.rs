@@ -1,6 +1,4 @@
-use crate::robot::systems::sync_robot_changes;
-use crate::robot::{Robot, RobotPlugin};
-use crate::ui::RobotLabUiPlugin;
+use crate::prelude::*;
 use bevy::prelude::{ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
 use bevy::{app::App, math::Vec3, prelude::{Camera3d, Commands, Component, Transform}, DefaultPlugins};
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
@@ -10,15 +8,16 @@ use bevy_rapier3d::plugin::PhysicsSet;
 use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode};
 use bevy_rapier3d::{plugin::RapierPhysicsPlugin, prelude::{Collider, RigidBody}};
 use k::SerialChain;
-use math::Real;
 use std::ops::DerefMut;
 
-mod kinematics;
-mod math;
+pub mod kinematics;
+pub mod math;
 #[allow(clippy::too_many_arguments)]
-mod ui;
-mod convert;
-mod robot;
+pub mod ui;
+pub mod convert;
+pub mod robot;
+pub mod error;
+pub mod prelude;
 
 fn main() {
     let mut app = App::new();
@@ -46,7 +45,7 @@ fn main() {
 
     app.add_systems(FixedUpdate, (
         sync_robot_changes.before(PhysicsSet::SyncBackend),
-        robot::systems::init_robots
+        init_robots
             .in_set(PhysicsSet::SyncBackend)
             .after(init_rigid_bodies)
             .after(init_colliders)

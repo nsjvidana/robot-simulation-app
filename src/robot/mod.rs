@@ -5,7 +5,7 @@ use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transf
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
-use crate::convert::urdf_rs_robot_to_xurdf;
+use crate::prelude::urdf_rs_robot_to_xurdf;
 
 pub mod systems;
 

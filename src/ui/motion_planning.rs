@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use crate::kinematics::ik::{ForwardDescentCyclic, KinematicNode};
-use crate::math::Real;
-use crate::ui::ribbon::{finish_ribbon_tab, finish_ui_section_vertical};
+use crate::ui::{EntitySelectionMode, SelectedEntities, UiGizmoGroup, ribbon::{finish_ribbon_tab, finish_ui_section_vertical}};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
@@ -10,8 +10,6 @@ use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint};
 use bevy_rapier3d::prelude::{RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint};
 use bevy_salva3d::bevy_rapier;
 use k::{JointType, NodeBuilder};
-use crate::robot::{RapierRobotHandles, Robot, RobotJointType, RobotPart};
-use crate::ui::{EntitySelectionMode, SelectedEntities, UiGizmoGroup};
 
 #[derive(Default)]
 pub struct MotionPlanning {
