@@ -1,6 +1,4 @@
-use crate::convert::urdf_rs_robot_to_xurdf;
-use crate::robot::Robot;
-use crate::transparent_button;
+use crate::prelude::*;
 use crate::ui::ribbon::finish_ui_section_vertical;
 use bevy::core::Name;
 use bevy::prelude::{Commands, Resource};
@@ -46,8 +44,8 @@ pub fn import_ui(
     commands: &mut Commands,
     ui: &mut Ui,
     importing: &mut RobotImporting,
-) -> (egui::Rect, &'static str) {
-    let resp = ui.vertical(|ui| {
+) -> Result<(egui::Rect, &'static str)> {
+    ui.vertical(|ui| -> Result<_> {
         // "Make roots fixed" checkbox
         let _checkbox = ui.checkbox(
             &mut importing.urdf_loader_options.make_roots_fixed,
@@ -80,12 +78,13 @@ pub fn import_ui(
                 .pick_file();
             if let Some(path) = dialog {
                 let robot_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-                let read_result = urdf_rs::read_file(&path);
-                if read_result.is_err() {
-                    panic!("{:?}", read_result.unwrap_err());
-                }
+                let robot_urdf = urdf_rs::read_file(&path)
+                    .map_err(|e| Error::Urdf {
+                        error: e.to_string(),
+                        robot_name: "UNKNOWN".to_string(),
+                    })?;
 
-                let robot_cmp = Robot::new(read_result.unwrap(), path.clone(), None);
+                let robot_cmp = Robot::new(robot_urdf, path.clone(), None);
                 commands.spawn((
                     match importing.import_joint_type {
                         ImportJointType::Impulse => robot_cmp.with_impulse_joints(),
@@ -97,7 +96,6 @@ pub fn import_ui(
                 ));
             }
         }
-        finish_ui_section_vertical!(ui, "Importing")
-    });
-    resp.inner
+        Ok(finish_ui_section_vertical!(ui, "Importing"))
+    }).inner
 }

@@ -59,7 +59,7 @@ pub fn motion_planning_ui(
     selected_entities: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
     ribbon_height: f32,
-) {
+) -> Result<()> {
     let mut rects = Vec::new();
     ui.horizontal(|ui| {
         egui::Grid::new("planning_ribbon")
@@ -69,6 +69,7 @@ pub fn motion_planning_ui(
             });
     });
     finish_ribbon_tab!(ui, rects);
+    Ok(())
 }
 
 pub fn ik_ui(

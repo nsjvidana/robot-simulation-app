@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::motion_planning::{
     ik_window, ik_window_function, motion_planning_ui, MotionPlanning,
@@ -21,6 +22,7 @@ use bevy_rapier3d::dynamics::{
 use bevy_rapier3d::plugin::RapierContext;
 use bevy_rapier3d::prelude::ReadDefaultRapierContext;
 use std::ops::Mul;
+use std::result;
 
 #[derive(Default, Resource)]
 pub struct Ribbon {
@@ -60,7 +62,7 @@ pub fn ribbon_ui(
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     // Ribbon
-    egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| {
+    let result = egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| -> Result<()> {
         ui.set_max_height(150.0);
         macro_rules! ribbon_btn {
             ($txt:expr, $tab_enum:expr) => {
@@ -107,7 +109,7 @@ pub fn ribbon_ui(
                     &mut physics_sim,
                     &ui_assets,
                     ribbon_height,
-                );
+                )
             }
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
@@ -115,11 +117,13 @@ pub fn ribbon_ui(
                     &mut selected_entities,
                     &mut motion_planning,
                     ribbon_height,
-                );
+                )
             }
-            _ => {}
+            _ => {Ok(())}
         }
     });
+
+    //TODO: write err event for ribbon
 
     //Physics sim window
     match ribbon.tab {
@@ -167,10 +171,10 @@ fn general_tab(
     physics_sim: &mut PhysicsSimulation,
     ui_assets: &RobotLabUiAssets,
     ribbon_height: f32,
-) {
+) -> Result<()> {
     let mut rects = Vec::new();
-    ui.horizontal(|ui| {
-        rects.push(import_ui(commands, ui, robot_importing));
+    ui.horizontal(|ui| -> Result<()> {
+        rects.push(import_ui(commands, ui, robot_importing)?);
         ui.add(egui::Separator::default().grow(ribbon_height));
         rects.push(position_tools_ui(
             ui,
@@ -184,9 +188,11 @@ fn general_tab(
         ui.add(egui::Separator::default().grow(ribbon_height));
         rects.push(simulation_ribbon_ui(ui, physics_sim, &ui_assets));
         ui.add(egui::Separator::default().grow(ribbon_height));
+        Ok(())
     });
 
     finish_ribbon_tab!(ui, rects);
+    Ok(())
 }
 
 pub fn ribbon_functionality(
