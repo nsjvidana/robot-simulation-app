@@ -1,5 +1,4 @@
-use bevy::ecs::query::QueryEntityError;
-use bevy::prelude::Entity;
+use bevy::prelude::Event;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -15,6 +14,14 @@ pub enum Error {
         error: String,
         robot_name: String
     },
+    #[error("Operation Failed: {0}")]
+    FailedOperation(String),
     #[error(transparent)]
     IO(#[from] std::io::Error),
+}
+
+#[derive(Event)]
+pub struct ErrorEvent {
+    pub error: Error,
+    pub location: Option<String>,
 }

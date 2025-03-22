@@ -61,13 +61,15 @@ pub fn motion_planning_ui(
     ribbon_height: f32,
 ) -> Result<()> {
     let mut rects = Vec::new();
-    ui.horizontal(|ui| {
+    ui.horizontal(|ui| -> Result<()> {
         egui::Grid::new("planning_ribbon")
             .num_columns(2)
-            .show(ui, |ui| {
-                rects.push(ik_ui(ui, selected_entities, motion_planning, ribbon_height));
-            });
-    });
+            .show(ui, |ui| -> Result<_> {
+                rects.push(ik_ui(ui, selected_entities, motion_planning, ribbon_height)?);
+                Ok(())
+            }).inner?;
+        Ok(())
+    }).inner?;
     finish_ribbon_tab!(ui, rects);
     Ok(())
 }
@@ -77,10 +79,10 @@ pub fn ik_ui(
     selected_ents: &mut SelectedEntities,
     motion_planning: &mut MotionPlanning,
     ribbon_height: f32,
-) -> (egui::Rect, &'static str) {
-    ui.horizontal(|ui| {
+) -> Result<(egui::Rect, &'static str)> {
+    ui.horizontal(|ui| -> Result<_> {
         let ret = ui
-            .vertical(|ui| {
+            .vertical(|ui| -> Result<_> {
                 let ik_btn = ui.button("Inverse Kinematics");
                 if ik_btn.clicked() {
                     if selected_ents.active_robot.is_some() {
@@ -96,17 +98,14 @@ pub fn ik_ui(
                         }
                         motion_planning.ik_window.open = true;
                     } else {
-                        // TODO: make a way for this msg to show up in the app
-                        bevy::log::error!("Failed IK: no active robot!");
+                        return Err(Error::FailedOperation("IK failed: no selected robot!".to_string()));
                     }
                 }
-                finish_ui_section_vertical!(ui, "Inverse Kinematics")
-            })
-            .inner;
+                Ok(finish_ui_section_vertical!(ui, "Inverse Kinematics"))
+            }).inner?;
         ui.add(Separator::default().grow(ribbon_height).spacing(0.));
-        ret
-    })
-    .inner
+        Ok(ret)
+    }).inner
 }
 
 pub fn ik_window(egui_ctx: &mut egui::Context, motion_planning: &mut MotionPlanning) {

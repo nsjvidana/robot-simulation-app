@@ -19,6 +19,7 @@ use bevy_rapier3d::{
 };
 use k::SerialChain;
 use std::ops::DerefMut;
+use crate::error::ErrorEvent;
 
 pub mod convert;
 pub mod error;
@@ -36,6 +37,8 @@ fn main() {
         dt: 1.0 / 60.0,
         substeps: 1,
     });
+
+    app.add_event::<ErrorEvent>();
 
     app.add_plugins((
         DefaultPlugins,

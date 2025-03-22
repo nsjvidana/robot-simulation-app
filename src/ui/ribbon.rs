@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::prelude::*;
 use crate::ui::import::{import_ui, RobotImporting};
 use crate::ui::motion_planning::{
@@ -9,10 +10,7 @@ use crate::ui::{
     PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup,
 };
 use bevy::input::ButtonInput;
-use bevy::prelude::{
-    Commands, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut,
-    Resource, With,
-};
+use bevy::prelude::{Commands, EventWriter, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Color32, Layout, Rgba, Ui, UiBuilder};
 use bevy_egui::EguiContexts;
@@ -38,6 +36,17 @@ pub enum RibbonTab {
     //maybe Electromagnetics?
 }
 
+impl Display for RibbonTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            RibbonTab::General => { "General Ribbon Tab" },
+            RibbonTab::MotionPlanning => { "Motion Planning Ribbon Tab" },
+            RibbonTab::Fluids => { "Fluids Ribbon Tab" },
+        }.to_string();
+        write!(f, "{}", str)
+    }
+}
+
 macro_rules! finish_ui_section_vertical {
     ($ui:expr, $label_name:expr) => {{
         egui::Label::new("").layout_in_ui($ui);
@@ -60,6 +69,8 @@ pub fn ribbon_ui(
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
     mut gizmos: Gizmos<UiGizmoGroup>,
+
+    mut errors: EventWriter<ErrorEvent>
 ) {
     // Ribbon
     let result = egui::TopBottomPanel::top("Ribbon").show(ctxs.ctx_mut(), |ui| -> Result<()> {
@@ -119,11 +130,16 @@ pub fn ribbon_ui(
                     ribbon_height,
                 )
             }
-            _ => {Ok(())}
+            _ => { Ok(()) }
         }
-    });
+    }).inner;
 
-    //TODO: write err event for ribbon
+    if let Err(error) = result {
+        errors.send(ErrorEvent {
+            error,
+            location: Some(ribbon.tab.to_string())
+        });
+    }
 
     //Physics sim window
     match ribbon.tab {
@@ -158,6 +174,7 @@ macro_rules! finish_ribbon_tab {
 use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 pub(crate) use finish_ribbon_tab;
+use crate::error::ErrorEvent;
 
 fn general_tab(
     ui: &mut Ui,
@@ -189,7 +206,7 @@ fn general_tab(
         rects.push(simulation_ribbon_ui(ui, physics_sim, &ui_assets));
         ui.add(egui::Separator::default().grow(ribbon_height));
         Ok(())
-    });
+    }).inner?;
 
     finish_ribbon_tab!(ui, rects);
     Ok(())
@@ -219,8 +236,10 @@ pub fn ribbon_functionality(
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     physics_sim: Res<PhysicsSimulation>,
+
+    mut errors: EventWriter<ErrorEvent>,
 ) {
-    let _result = match ribbon.tab {
+    let result = match ribbon.tab {
         RibbonTab::General => {
             position_tools_functionality(
                 &mut position_tools,
@@ -243,5 +262,10 @@ pub fn ribbon_functionality(
         }
         _ => {Ok(())}
     };
-    // TODO: Handle result. maybe using event writer to display errors in app
+    if let Err(error) = result {
+        errors.send(ErrorEvent {
+            error,
+            location: Some(ribbon.tab.to_string())
+        });
+    }
 }
