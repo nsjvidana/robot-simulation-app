@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
 use crate::ui::ribbon::finish_ui_section_vertical;
 use crate::ui::simulation::PhysicsSimulation;
@@ -214,14 +215,14 @@ pub fn position_tools_functionality(
     mouse_just_released: bool,
     mouse_pressed: bool,
     physics_sim: &PhysicsSimulation,
-) {
+) -> Result<()> {
     if scene_window_data.viewport_to_world_ray.is_none()
         || position_tools.gizmos_origin.is_none()
         || position_tools.gizmos_axes.is_none()
         || selected_entities.active_robot.is_none()
         || physics_sim.physics_active
     {
-        return;
+        return Ok(());
     }
     let ray = scene_window_data.viewport_to_world_ray.unwrap();
     let gizmos_origin = position_tools.gizmos_origin.unwrap();
@@ -413,6 +414,7 @@ pub fn position_tools_functionality(
             }
         }
     }
+    Ok(())
 }
 
 pub fn compute_intersection_pos(

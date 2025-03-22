@@ -214,7 +214,7 @@ pub fn ribbon_functionality(
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     physics_sim: Res<PhysicsSimulation>,
 ) {
-    match ribbon.tab {
+    let _result = match ribbon.tab {
         RibbonTab::General => {
             position_tools_functionality(
                 &mut position_tools,
@@ -224,7 +224,7 @@ pub fn ribbon_functionality(
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
                 &physics_sim,
-            );
+            )
         }
         RibbonTab::MotionPlanning => {
             ik_window_function(
@@ -233,8 +233,9 @@ pub fn ribbon_functionality(
                 &mut motion_planning,
                 &robot_q,
                 &joint_q,
-            );
+            )
         }
-        _ => {}
-    }
+        _ => {Ok(())}
+    };
+    // TODO: Handle result. maybe using event writer to display errors in app
 }

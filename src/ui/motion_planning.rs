@@ -167,16 +167,19 @@ pub fn ik_window_function(
             With<RapierMultibodyJointHandle>,
         )>,
     >,
-) {
+) -> Result<()> {
     if !motion_planning.ik_window.open {
-        return;
+        return Ok(());
     }
 
     let ik_window = &mut motion_planning.ik_window;
     let active_robot = selected_ents.active_robot.unwrap();
     let (robot, rapier_handles) = robot_q
         .get(active_robot)
-        .expect("Robot doesn't have robot/handles component!");
+        .map_err(|_| Error::MissingComponent {
+            entity_name: active_robot.to_string(),
+            component_name: "(&Robot, &RapierRobotHandles)".to_string(),
+        })?;
 
     let selected_joints = {
         match selected_ents.selection_mode {
@@ -184,7 +187,7 @@ pub fn ik_window_function(
                 ref selected_joints,
                 ..
             } => selected_joints,
-            _ => return,
+            _ => return Ok(()),
         }
     };
 
@@ -221,4 +224,5 @@ pub fn ik_window_function(
         }
         ik_window.create_ik_chain = false;
     }
+    Ok(())
 }

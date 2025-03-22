@@ -119,7 +119,7 @@ pub fn init_robots(
         // JointHandle is an option to account for multibody joint handles
         // SAFETY: since the rapier context is accessed mutably, bevy restricts any other threads from
         //         accessing the context, so this should be safe
-        let handles: UrdfRobotHandles<Option<Index>> = unsafe {
+        let handles: Result<UrdfRobotHandles<Option<Index>>> = (|| unsafe {
             let mut urdf_robot = UrdfRobot::from_robot(
                 &urdf_rs_robot_to_xurdf(robot.urdf.clone()),
                 importing.urdf_loader_options.clone(),
@@ -140,16 +140,16 @@ pub fn init_robots(
                         Using SimpleTransmission implementation anyways.");
                 }
                 // TODO: make error struct to handle errors and display them in the app instead of crashing
-                let joint_name = transmission.joints.first().map(|v| &v.name).expect(
-                    format!("UrdfError: no joints in transmission {}", transmission.name).as_str(),
-                );
-                let actuator = transmission.actuators.first().map(|v| &v.name).expect(
-                    format!(
-                        "UrdfError: no actuators in transmission {}",
-                        transmission.name
-                    )
-                    .as_str(),
-                );
+                let joint_name = transmission.joints.first().map(|v| &v.name)
+                    .ok_or_else(|| Error::Urdf {
+                        error: format!("no joints in transmission {}", transmission.name),
+                        robot_name: robot.urdf.name.clone()
+                    })?;
+                let actuator = transmission.actuators.first().map(|v| &v.name)
+                    .ok_or_else(|| Error::Urdf {
+                        error: format!("no actuators in transmission {}", transmission.name),
+                        robot_name: robot.urdf.name.clone()
+                    })?;
                 let (joint, rapier_j) = robot
                     .urdf
                     .joints
@@ -157,20 +157,23 @@ pub fn init_robots(
                     .zip(urdf_robot.joints.iter_mut())
                     .find(|(j, _)| j.name.eq(joint_name))
                     .map(|(j1, j2)| (j1, &mut j2.joint))
-                    .expect(
-                        format!(
-                            "Can't find joint {0} in robot {1}",
-                            joint_name, robot.urdf.name
-                        )
-                        .as_str(),
-                    );
+                    .ok_or_else(|| Error::Urdf {
+                        error: format!("Can't find joint {joint_name}"),
+                        robot_name: robot.urdf.name.clone()
+                    })?;
                 rapier_j.motor_axes = !rapier_j.locked_axes;
                 for i in 0..6 {
                     let curr_bit = 1 << i;
                     if (rapier_j.motor_axes.bits() & curr_bit) != 0 {
                         let motor = &mut rapier_j.motors[i];
                         motor.max_force = joint.limit.effort as Real;
-                        motor.target_vel = joint.limit.velocity as Real;
+                        if let Some(ctrl) = &joint.safety_controller {
+                            motor.target_pos = ctrl.k_position as Real;
+                            motor.target_vel = ctrl.k_velocity as Real;
+                        }
+                        else {
+                            motor.target_vel = joint.limit.velocity as Real;
+                        }
                     }
                 }
             }
@@ -191,10 +194,10 @@ pub fn init_robots(
                             joint: Some(j.joint.0),
                         })
                         .collect();
-                    UrdfRobotHandles {
+                    Ok(UrdfRobotHandles {
                         links: handles.links,
                         joints,
-                    }
+                    })
                 }
                 RobotJointType::MultibodyJoints(options) => {
                     let handles = urdf_robot.insert_using_multibody_joints(
@@ -212,13 +215,19 @@ pub fn init_robots(
                             joint: j.joint.map(|j| j.0),
                         })
                         .collect();
-                    UrdfRobotHandles {
+                    Ok(UrdfRobotHandles {
                         links: handles.links,
                         joints,
-                    }
+                    })
                 }
             }
-        };
+        })();
+        let handles =
+            if handles.is_err() {
+                // TODO: display error in app
+                continue;
+            }
+            else { handles.unwrap() };
         // SAFETY: This is ok since crate::convert::RapierContext is implemented exactly the same as
         //         the bevy_rapier RapierContext
         let mut context: Mut<crate::convert::RapierContext> =
