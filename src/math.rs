@@ -48,6 +48,7 @@ mod k_math {
 mod bevy_rapier_math {
     use crate::math::Real;
     use bevy_rapier3d::na::{UnitVector3, Vector3};
+    use bevy_rapier3d::rapier::geometry::Ray;
 
     /// Returns a value `a` such that `ray_origin + (ray_dir * a)` gives a value `interesction_point`
     ///
@@ -63,5 +64,24 @@ mod bevy_rapier_math {
             return None;
         }
         Some(-numerator / denom)
+    }
+
+    pub fn compute_intersection_pos(
+        ray: &Ray,
+        plane_pos: &Vector3<Real>,
+        plane_normal: &UnitVector3<Real>,
+    ) -> Option<Vector3<Real>> {
+        let scale = ray_scale_for_plane_intersect_local(
+            &plane_normal,
+            &(ray.origin.coords - plane_pos),
+            &ray.dir,
+        );
+        if let Some(scale) = scale {
+            if scale >= 0. {
+                // Ensure the intersection isn't behind the camera
+                return Some(ray.origin.coords + ray.dir * scale);
+            }
+        }
+        None
     }
 }

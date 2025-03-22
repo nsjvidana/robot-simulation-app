@@ -4,7 +4,7 @@ use crate::ui::import::{import_ui, import_window, RobotImporting};
 use crate::ui::motion_planning::{
     ik_window, ik_window_function, motion_planning_ui, MotionPlanning,
 };
-use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
+use crate::ui::position_tools::{position_tools_ui, PositionTools};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
 use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup, UiResources};
 use bevy::input::ButtonInput;
@@ -239,8 +239,8 @@ pub fn ribbon_functionality(
 ) {
     let result = match ribbon.tab {
         RibbonTab::General => || -> Result<()> {
-            position_tools_functionality(
-                &mut ui_resources,
+            ui_resources.position_tools.functionality(
+                &mut ui_resources.simulation,
                 &scene_window_data,
                 &mut selected_entities,
                 &mut transform_q,
