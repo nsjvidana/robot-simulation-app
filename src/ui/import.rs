@@ -23,7 +23,7 @@ pub struct RobotImporting {
 }
 
 impl RobotImporting {
-    pub fn run(&self, commands: &mut Commands) -> Result<()> {
+    pub fn functionality(&self, commands: &mut Commands) -> Result<()> {
         // Import urdf robot via file dialog
         if self.import_triggered {
             let path = PathBuf::from(&self.import_file_path);
@@ -34,7 +34,11 @@ impl RobotImporting {
                     robot_name: "<Unknown Robot>".to_string(),
                 })?;
 
-            let robot_cmp = Robot::new(robot_urdf, path.clone(), None);
+            let mesh_dir = PathBuf::from(&self.mesh_dir);
+            let mesh_dir =
+                if mesh_dir.exists() && mesh_dir.is_dir() { Some(mesh_dir) }
+                else { None };
+            let robot_cmp = Robot::new(robot_urdf, path.clone(), mesh_dir);
             commands.spawn((
                 match self.import_joint_type {
                     ImportJointType::Impulse => robot_cmp.with_impulse_joints(),

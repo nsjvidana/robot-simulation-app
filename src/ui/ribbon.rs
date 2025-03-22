@@ -247,6 +247,7 @@ pub fn ribbon_functionality(
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
             )?;
+            ui_resources.import.functionality(&mut commands)?;
             Ok(())
         }(),
         RibbonTab::MotionPlanning => || -> Result<()> {

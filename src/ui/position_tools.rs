@@ -220,11 +220,8 @@ pub fn position_tools_functionality(
     mouse_just_released: bool,
     mouse_pressed: bool,
 ) -> Result<()> {
-    let UiResources {
-        position_tools,
-        simulation: physics_sim,
-        ..
-    } = ui_resources;
+    let position_tools = &mut *ui_resources.position_tools;
+    let physics_sim = &mut *ui_resources.simulation;
     if scene_window_data.viewport_to_world_ray.is_none()
         || position_tools.gizmos_origin.is_none()
         || position_tools.gizmos_axes.is_none()
