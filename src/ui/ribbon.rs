@@ -223,47 +223,37 @@ pub fn ribbon_functionality(
     mut commands: Commands,
     ribbon: Res<Ribbon>,
     mut selected_entities: ResMut<SelectedEntities>,
-    mut position_tools: ResMut<PositionTools>,
     mut transform_q: Query<&mut GlobalTransform>,
-
-    mut motion_planning: NonSendMut<MotionPlanning>,
-
+    mut ui_resources: UiResources,
     robot_q: Query<(&Robot, &RapierRobotHandles)>,
     joint_q: Query<
         (
-            Option<&RapierImpulseJointHandle>,
-            Option<&RapierMultibodyJointHandle>,
-            Option<&KinematicNode>,
+            Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>, Option<&KinematicNode>,
         ),
-        Or<(
-            With<RapierImpulseJointHandle>,
-            With<RapierMultibodyJointHandle>,
-        )>,
+        Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>,)>,
     >,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
-    physics_sim: Res<PhysicsSimulation>,
 
     mut errors: EventWriter<ErrorEvent>,
 ) {
     let result = match ribbon.tab {
         RibbonTab::General => || -> Result<()> {
             position_tools_functionality(
-                &mut position_tools,
+                &mut ui_resources,
                 &scene_window_data,
                 &mut selected_entities,
                 &mut transform_q,
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
-                &physics_sim,
             )?;
             Ok(())
         }(),
         RibbonTab::MotionPlanning => || -> Result<()> {
             ik_window_function(
+                &mut ui_resources,
                 &mut commands,
                 &mut selected_entities,
-                &mut motion_planning,
                 &robot_q,
                 &joint_q,
             )?;

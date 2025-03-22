@@ -149,9 +149,9 @@ pub fn ik_window(egui_ctx: &mut egui::Context, ui_resources: &mut UiResources) {
 }
 
 pub fn ik_window_function(
+    ui_resources: &mut UiResources,
     commands: &mut Commands,
     selected_ents: &mut SelectedEntities,
-    motion_planning: &mut MotionPlanning,
     robot_q: &Query<(&Robot, &RapierRobotHandles)>,
     joint_q: &Query<
         (
@@ -165,6 +165,7 @@ pub fn ik_window_function(
         )>,
     >,
 ) -> Result<()> {
+    let motion_planning = &mut ui_resources.motion_planning;
     if !motion_planning.ik_window.open {
         return Ok(());
     }

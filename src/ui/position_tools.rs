@@ -213,14 +213,18 @@ pub fn position_tools_ui(
 }
 
 pub fn position_tools_functionality(
-    position_tools: &mut PositionTools,
+    ui_resources: &mut UiResources,
     scene_window_data: &SceneWindowData,
     selected_entities: &mut SelectedEntities,
     transform_q: &mut Query<&mut GlobalTransform>,
     mouse_just_released: bool,
     mouse_pressed: bool,
-    physics_sim: &PhysicsSimulation,
 ) -> Result<()> {
+    let UiResources {
+        position_tools,
+        simulation: physics_sim,
+        ..
+    } = ui_resources;
     if scene_window_data.viewport_to_world_ray.is_none()
         || position_tools.gizmos_origin.is_none()
         || position_tools.gizmos_axes.is_none()
