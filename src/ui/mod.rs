@@ -11,7 +11,7 @@ use bevy::app::App;
 use bevy::asset::Handle;
 use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::ecs::system::SystemState;
+use bevy::ecs::system::{SystemParam, SystemState};
 use bevy::gizmos::AppGizmoBuilder;
 use bevy::gizmos::GizmoPlugin;
 use bevy::image::Image;
@@ -101,6 +101,14 @@ impl Plugin for RobotLabUiPlugin {
                 .after(PhysicsSet::SyncBackend),
         );
     }
+}
+
+#[derive(SystemParam)]
+pub struct UiResources<'w> {
+    ribbon: ResMut<'w, ribbon::Ribbon>,
+    import: ResMut<'w, import::RobotImporting>,
+    position_tools: ResMut<'w, position_tools::PositionTools>,
+    simulation: ResMut<'w, simulation::PhysicsSimulation>,
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
