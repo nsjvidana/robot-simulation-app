@@ -1,14 +1,12 @@
 use std::fmt::Display;
 use crate::prelude::*;
-use crate::ui::import::{import_ui, RobotImporting};
+use crate::ui::import::{import_ui, import_window, RobotImporting};
 use crate::ui::motion_planning::{
     ik_window, ik_window_function, motion_planning_ui, MotionPlanning,
 };
 use crate::ui::position_tools::{position_tools_functionality, position_tools_ui, PositionTools};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
-use crate::ui::{
-    PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup,
-};
+use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup, UiResources};
 use bevy::input::ButtonInput;
 use bevy::prelude::{Commands, EventWriter, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::egui;
@@ -57,14 +55,10 @@ macro_rules! finish_ui_section_vertical {
 pub(crate) use finish_ui_section_vertical;
 
 pub fn ribbon_ui(
-    mut commands: Commands,
     mut ctxs: EguiContexts,
     mut ribbon: ResMut<Ribbon>,
     mut selected_entities: ResMut<SelectedEntities>,
-    mut position_tools: ResMut<PositionTools>,
-    mut robot_importing: ResMut<RobotImporting>,
-    mut physics_sim: ResMut<PhysicsSimulation>,
-    mut motion_planning: NonSendMut<MotionPlanning>,
+    mut ui_resources: UiResources,
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
@@ -110,30 +104,27 @@ pub fn ribbon_ui(
             RibbonTab::General => {
                 general_tab(
                     ui,
-                    &mut commands,
-                    &mut robot_importing,
-                    &mut position_tools,
+                    &mut ui_resources,
                     &mut selected_entities,
                     &scene_window_data,
                     &transform_q,
                     &mut gizmos,
-                    &mut physics_sim,
                     &ui_assets,
                     ribbon_height,
-                )
+                );
+                Ok(())
             }
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
                     ui,
                     &mut selected_entities,
-                    &mut motion_planning,
+                    &mut ui_resources,
                     ribbon_height,
                 )
             }
             _ => { Ok(()) }
         }
     }).inner;
-
     if let Err(error) = result {
         errors.send(ErrorEvent {
             error,
@@ -141,15 +132,17 @@ pub fn ribbon_ui(
         });
     }
 
-    //Physics sim window
-    match ribbon.tab {
-        RibbonTab::General => {
-            simulation_control_window(ctxs.ctx_mut(), &mut physics_sim);
-        }
-        RibbonTab::MotionPlanning => {
-            ik_window(ctxs.ctx_mut(), &mut motion_planning);
-        }
-        _ => {}
+    // UI windows
+    let result = match ribbon.tab {
+        RibbonTab::General => Ok(general_windows(ctxs.ctx_mut(), &mut ui_resources)),
+        RibbonTab::MotionPlanning => Ok(motion_planning_windows(ctxs.ctx_mut(), &mut ui_resources)),
+        _ => {Ok(())}
+    };
+    if let Err(error) = result {
+        errors.send(ErrorEvent {
+            error,
+            location: Some(ribbon.tab.to_string())
+        });
     }
 
     if ctxs.ctx_mut().is_using_pointer() {
@@ -178,38 +171,52 @@ use crate::error::ErrorEvent;
 
 fn general_tab(
     ui: &mut Ui,
-    commands: &mut Commands,
-    robot_importing: &mut RobotImporting,
-    position_tools: &mut PositionTools,
+    ui_resources: &mut UiResources,
     selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
     transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>,
-    physics_sim: &mut PhysicsSimulation,
     ui_assets: &RobotLabUiAssets,
     ribbon_height: f32,
-) -> Result<()> {
+) {
     let mut rects = Vec::new();
-    ui.horizontal(|ui| -> Result<()> {
-        rects.push(import_ui(commands, ui, robot_importing)?);
+    ui.horizontal(|ui| {
+        rects.push(import_ui(ui, ui_resources));
         ui.add(egui::Separator::default().grow(ribbon_height));
         rects.push(position_tools_ui(
             ui,
-            position_tools,
+            ui_resources,
             selected_entities,
             scene_window_data,
             transform_q,
             gizmos,
-            physics_sim,
         ));
         ui.add(egui::Separator::default().grow(ribbon_height));
-        rects.push(simulation_ribbon_ui(ui, physics_sim, &ui_assets));
+        rects.push(simulation_ribbon_ui(ui, ui_resources, &ui_assets));
         ui.add(egui::Separator::default().grow(ribbon_height));
-        Ok(())
-    }).inner?;
+    });
 
     finish_ribbon_tab!(ui, rects);
-    Ok(())
+}
+
+fn general_windows(
+    egui_ctx: &mut egui::Context,
+    resources: &mut UiResources
+) {
+    let UiResources {
+        simulation,
+        import,
+        ..
+    } = resources;
+    simulation_control_window(egui_ctx, simulation);
+    import_window(egui_ctx, import);
+}
+
+fn motion_planning_windows(
+    egui_ctx: &mut egui::Context,
+    resources: &mut UiResources,
+) {
+    ik_window(egui_ctx, resources);
 }
 
 pub fn ribbon_functionality(
@@ -240,7 +247,7 @@ pub fn ribbon_functionality(
     mut errors: EventWriter<ErrorEvent>,
 ) {
     let result = match ribbon.tab {
-        RibbonTab::General => {
+        RibbonTab::General => || -> Result<()> {
             position_tools_functionality(
                 &mut position_tools,
                 &scene_window_data,
@@ -249,18 +256,20 @@ pub fn ribbon_functionality(
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
                 &physics_sim,
-            )
-        }
-        RibbonTab::MotionPlanning => {
+            )?;
+            Ok(())
+        }(),
+        RibbonTab::MotionPlanning => || -> Result<()> {
             ik_window_function(
                 &mut commands,
                 &mut selected_entities,
                 &mut motion_planning,
                 &robot_q,
                 &joint_q,
-            )
-        }
-        _ => {Ok(())}
+            )?;
+            Ok(())
+        }(),
+        _ => { Ok(()) }
     };
     if let Err(error) = result {
         errors.send(ErrorEvent {

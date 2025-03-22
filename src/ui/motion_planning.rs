@@ -1,9 +1,6 @@
 use crate::kinematics::ik::{ForwardDescentCyclic, KinematicNode};
 use crate::prelude::*;
-use crate::ui::{
-    ribbon::{finish_ribbon_tab, finish_ui_section_vertical},
-    EntitySelectionMode, SelectedEntities, UiGizmoGroup,
-};
+use crate::ui::{ribbon::{finish_ribbon_tab, finish_ui_section_vertical}, EntitySelectionMode, SelectedEntities, UiGizmoGroup, UiResources};
 use bevy::prelude::{Commands, Gizmos, GlobalTransform, Or, Query, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
@@ -57,7 +54,7 @@ pub enum IKSolverType {
 pub fn motion_planning_ui(
     ui: &mut Ui,
     selected_entities: &mut SelectedEntities,
-    motion_planning: &mut MotionPlanning,
+    ui_resources: &mut UiResources,
     ribbon_height: f32,
 ) -> Result<()> {
     let mut rects = Vec::new();
@@ -65,7 +62,7 @@ pub fn motion_planning_ui(
         egui::Grid::new("planning_ribbon")
             .num_columns(2)
             .show(ui, |ui| -> Result<_> {
-                rects.push(ik_ui(ui, selected_entities, motion_planning, ribbon_height)?);
+                rects.push(ik_ui(ui, selected_entities, &mut ui_resources.motion_planning, ribbon_height)?);
                 Ok(())
             }).inner?;
         Ok(())
@@ -108,8 +105,8 @@ pub fn ik_ui(
     }).inner
 }
 
-pub fn ik_window(egui_ctx: &mut egui::Context, motion_planning: &mut MotionPlanning) {
-    let ik_window = &mut motion_planning.ik_window;
+pub fn ik_window(egui_ctx: &mut egui::Context, ui_resources: &mut UiResources) {
+    let ik_window = &mut ui_resources.motion_planning.ik_window;
     egui::Window::new("Inverse Kinematcs")
         .open(&mut ik_window.open)
         .show(egui_ctx, |ui| {

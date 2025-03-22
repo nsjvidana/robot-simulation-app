@@ -1,6 +1,6 @@
 use crate::robot::RobotSet;
 use crate::ui::ribbon::finish_ui_section_vertical;
-use crate::ui::RobotLabUiAssets;
+use crate::ui::{RobotLabUiAssets, UiResources};
 use bevy::prelude::{Commands, Query, ResMut, Resource, With};
 use bevy::utils::default;
 use bevy_egui::egui;
@@ -59,7 +59,7 @@ pub struct SimulationSnapshot {
 
 pub fn simulation_ribbon_ui(
     ui: &mut Ui,
-    physics_sim: &mut PhysicsSimulation,
+    ui_resources: &mut UiResources,
     ui_assets: &RobotLabUiAssets,
 ) -> (egui::Rect, &'static str) {
     let resp = ui.vertical(|ui| {
@@ -69,7 +69,7 @@ pub fn simulation_ribbon_ui(
         );
         ui.label("Run Simulation");
         if btn.clicked() {
-            physics_sim.control_window_open = true;
+            ui_resources.simulation.control_window_open = true;
         }
         finish_ui_section_vertical!(ui, "Simulation")
     });

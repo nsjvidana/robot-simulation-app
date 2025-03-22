@@ -16,12 +16,7 @@ use bevy::gizmos::AppGizmoBuilder;
 use bevy::gizmos::GizmoPlugin;
 use bevy::image::Image;
 use bevy::math::Vec3;
-use bevy::prelude::{
-    AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld,
-    GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d,
-    KeyCode, Local, Mat3, MouseButton, Name, Or, Parent, Plugin, Quat, Query, Ray3d, Reflect, Res,
-    ResMut, Resource, Single, Transform, Window, With, World,
-};
+use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, FromWorld, GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, KeyCode, Local, Mat3, MouseButton, Name, NonSendMut, Or, Parent, Plugin, Quat, Query, Ray3d, Reflect, Res, ResMut, Resource, Single, Transform, Window, With, World};
 use bevy_egui::egui::{Align, ComboBox, Label, Layout, TextureId, Ui, UiBuilder};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -39,6 +34,7 @@ use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
+use crate::ui::motion_planning::MotionPlanning;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -105,10 +101,14 @@ impl Plugin for RobotLabUiPlugin {
 
 #[derive(SystemParam)]
 pub struct UiResources<'w> {
-    ribbon: ResMut<'w, ribbon::Ribbon>,
     import: ResMut<'w, import::RobotImporting>,
     position_tools: ResMut<'w, position_tools::PositionTools>,
     simulation: ResMut<'w, simulation::PhysicsSimulation>,
+    motion_planning: NonSendMut<'w, MotionPlanning>,
+}
+
+pub trait View {
+    fn ui(&mut self, ui: &mut Ui);
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup)]

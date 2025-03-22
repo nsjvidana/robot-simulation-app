@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::math::{ray_scale_for_plane_intersect_local, Real};
 use crate::ui::ribbon::finish_ui_section_vertical;
 use crate::ui::simulation::PhysicsSimulation;
-use crate::ui::{PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup};
+use crate::ui::{PointerUsageState, SceneWindowData, SelectedEntities, UiGizmoGroup, UiResources};
 use bevy::color::Color;
 use bevy::math::Vec3;
 use bevy::prelude::{Gizmos, GlobalTransform, Isometry3d, Mat3, Quat, Query, Resource, Transform};
@@ -72,13 +72,18 @@ impl Default for PositionTool {
 /// The function that draws the Position UI and any gizmos associated with the current tool
 pub fn position_tools_ui(
     ui: &mut Ui,
-    position_tools: &mut PositionTools,
+    ui_resources: &mut UiResources,
     selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
     transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>,
-    physics_sim: &PhysicsSimulation,
 ) -> (egui::Rect, &'static str) {
+    let UiResources {
+        position_tools,
+        simulation: physics_sim,
+        ..
+    } = ui_resources;
+
     // Ribbon UI
     let resp = ui.vertical(|ui| {
         ui.horizontal(|ui| {
