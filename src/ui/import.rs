@@ -13,7 +13,7 @@ use crate::ui::{UiResources, View};
 
 #[derive(Resource)]
 pub struct RobotImporting {
-    pub is_open: bool,
+    pub window_is_open: bool,
     pub import_triggered: bool,
     pub mb_loader_options: UrdfMultibodyOptions,
     pub urdf_loader_options: UrdfLoaderOptions,
@@ -53,7 +53,7 @@ impl RobotImporting {
 impl Default for RobotImporting {
     fn default() -> Self {
         Self {
-            is_open: false,
+            window_is_open: false,
             import_triggered: false,
             mb_loader_options: default(),
             urdf_loader_options: UrdfLoaderOptions {
@@ -82,16 +82,24 @@ impl View for RobotImporting {
                     ui.add(egui::TextEdit::singleline(&mut self.import_file_path));
                     let import_browse = ui.button("Browse");
                     if import_browse.clicked() {
-                        // TODO: set self.import_browse with file dialog
+                        let dialog = rfd::FileDialog::new()
+                            .add_filter("Robot Description", &["urdf", "URDF"])
+                            .pick_file();
+                        if let Some(path) = dialog {
+                            self.import_file_path = path.display().to_string();
+                        }
                     }
                     ui.end_row();
-
 
                     ui.label("Mesh Directory (optional):");
                     ui.add(egui::TextEdit::singleline(&mut self.mesh_dir));
                     let mesh_dir_browse = ui.button("Browse");
                     if mesh_dir_browse.clicked() {
-                        // TODO: set self.mesh_dir with file dialog
+                        let dialog = rfd::FileDialog::new()
+                            .pick_folder();
+                        if let Some(path) = dialog {
+                            self.mesh_dir = path.display().to_string();
+                        }
                     }
                     ui.end_row();
                 });
@@ -141,7 +149,7 @@ pub fn import_ui(
     ui.vertical(|ui| {
         let button = ui.button("Import URDF");
         if button.clicked() {
-            ui_resources.import.is_open = true;
+            ui_resources.import.window_is_open = true;
         }
         finish_ui_section_vertical!(ui, "Importing")
     }).inner
@@ -151,7 +159,7 @@ pub fn import_window(
     egui_ctx: &mut egui::Context,
     importing: &mut RobotImporting,
 ) {
-    let mut is_open = importing.is_open;
+    let mut is_open = importing.window_is_open;
     egui::Window::new("Import window")
         .open(&mut is_open)
         .show(egui_ctx, |ui| {
@@ -164,5 +172,5 @@ pub fn import_window(
                 })
         });
     // Avoid borrow checker
-    importing.is_open = is_open;
+    importing.window_is_open = is_open;
 }
