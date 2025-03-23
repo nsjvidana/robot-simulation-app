@@ -163,16 +163,10 @@ pub fn import_window(
     importing: &mut RobotImporting,
 ) {
     let mut is_open = importing.window_is_open;
-    egui::Window::new("Import window")
+    egui::Window::new("Import URDF")
         .open(&mut is_open)
         .show(egui_ctx, |ui| {
-            egui::Grid::new("grid")
-                .num_columns(2)
-                .striped(true)
-                .spacing([40.0, 4.0])
-                .show(ui, |ui| {
-                    importing.ui(ui);
-                })
+            importing.ui(ui);
         });
     // Avoid borrow checker
     importing.window_is_open = is_open;
