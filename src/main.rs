@@ -55,18 +55,6 @@ fn main() {
     app.add_systems(Startup, startup);
     app.add_systems(Update, update);
 
-    app.add_systems(
-        FixedUpdate,
-        (
-            sync_robot_changes.before(PhysicsSet::SyncBackend),
-            init_robots
-                .in_set(PhysicsSet::SyncBackend)
-                .after(init_rigid_bodies)
-                .after(init_colliders)
-                .after(init_joints),
-        ),
-    );
-
     app.run();
 }
 

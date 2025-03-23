@@ -1,11 +1,13 @@
 use crate::prelude::urdf_rs_robot_to_xurdf;
 use bevy::app::App;
-use bevy::prelude::{Component, Entity, GlobalTransform, Plugin, Resource, Transform};
+use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use bevy_rapier3d::prelude::systems::*;
 use crate::math::Real;
 
 pub mod systems;
@@ -15,6 +17,18 @@ pub struct RobotPlugin;
 impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RobotSet>();
+
+        app.add_systems(
+            FixedUpdate,
+            (
+                systems::sync_robot_changes.before(PhysicsSet::SyncBackend),
+                systems::init_robots
+                    .in_set(PhysicsSet::SyncBackend)
+                    .after(init_rigid_bodies)
+                    .after(init_colliders)
+                    .after(init_joints),
+            ),
+        );
     }
 }
 
