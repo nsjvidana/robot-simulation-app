@@ -1,3 +1,4 @@
+use crate::error::ErrorEvent;
 use crate::prelude::*;
 use bevy::prelude::{
     ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With,
@@ -10,8 +11,6 @@ use bevy::{
 };
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier3d::plugin::systems::{init_colliders, init_joints, init_rigid_bodies};
-use bevy_rapier3d::plugin::PhysicsSet;
 use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode};
 use bevy_rapier3d::{
     plugin::RapierPhysicsPlugin,
@@ -19,7 +18,6 @@ use bevy_rapier3d::{
 };
 use k::SerialChain;
 use std::ops::DerefMut;
-use crate::error::ErrorEvent;
 
 pub mod convert;
 pub mod error;

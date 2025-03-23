@@ -141,8 +141,8 @@ impl View for RobotImporting {
 #[derive(Default, PartialEq)]
 pub enum ImportJointType {
     #[default]
-    Impulse,
     Multibody,
+    Impulse,
 }
 
 pub fn import_ui(
