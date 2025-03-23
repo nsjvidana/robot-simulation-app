@@ -2,7 +2,7 @@ use std::fmt::Display;
 use crate::prelude::*;
 use crate::ui::import::{import_ui, import_window, RobotImporting};
 use crate::ui::motion_planning::{
-    ik_window, ik_window_function, motion_planning_ui, MotionPlanning,
+    ik_window, motion_planning_ui, MotionPlanning,
 };
 use crate::ui::position_tools::{position_tools_ui, PositionTools};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
@@ -253,13 +253,7 @@ pub fn ribbon_functionality(
             Ok(())
         }(),
         RibbonTab::MotionPlanning => || -> Result<()> {
-            ik_window_function(
-                &mut ui_resources,
-                &mut commands,
-                &mut selected_entities,
-                &robot_q,
-                &joint_q,
-            )?;
+
             Ok(())
         }(),
         _ => { Ok(()) }
