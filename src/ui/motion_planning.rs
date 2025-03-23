@@ -1,23 +1,29 @@
 use crate::kinematics::ik::{ForwardDescentCyclic, KinematicNode};
 use crate::prelude::*;
-use crate::ui::{ribbon::{finish_ribbon_tab, finish_ui_section_vertical}, EntitySelectionMode, SelectedEntities, UiGizmoGroup, UiResources};
-use bevy::prelude::{Commands, Gizmos, GlobalTransform, Or, Query, With};
+use crate::ui::{ribbon::{finish_ribbon_tab, finish_ui_section_vertical}, EntitySelectionMode, SelectedEntities, UiResources};
+use bevy::prelude::{Commands, Or, Query, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
-use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint};
 use bevy_rapier3d::prelude::{
-    RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle, TypedJoint,
+    RapierImpulseJointHandle, RapierMultibodyJointHandle,
 };
-use bevy_salva3d::bevy_rapier;
-use k::{JointType, NodeBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
+use std::ops::DerefMut;
 
 #[derive(Default)]
 pub struct MotionPlanning {
     ik_window: InverseKinematicsWindow,
+    create_plan: bool,
+    edit_plan_open: bool,
     //RRT?
     //Vehicle controller?
+}
+
+impl MotionPlanning {
+    pub fn clear_clicks(&mut self) {
+        self.create_plan = false;
+    }
 }
 
 pub struct InverseKinematicsWindow {
@@ -53,21 +59,30 @@ pub enum IKSolverType {
 
 pub fn motion_planning_ui(
     ui: &mut Ui,
-    selected_entities: &mut SelectedEntities,
     ui_resources: &mut UiResources,
-    ribbon_height: f32,
 ) -> Result<()> {
-    let mut rects = Vec::new();
-    ui.horizontal(|ui| -> Result<()> {
-        egui::Grid::new("planning_ribbon")
-            .num_columns(2)
-            .show(ui, |ui| -> Result<_> {
-                rects.push(ik_ui(ui, selected_entities, &mut ui_resources.motion_planning, ribbon_height)?);
-                Ok(())
-            }).inner?;
-        Ok(())
-    }).inner?;
-    finish_ribbon_tab!(ui, rects);
+    let motion_planning = ui_resources.motion_planning.deref_mut();
+    motion_planning.clear_clicks();
+
+    let num_cols = 2;
+    let mut column_rects = Vec::with_capacity(num_cols);
+    egui::Grid::new("planning_ribbon")
+        .num_columns(num_cols)
+        .show(ui, |ui| {
+            // Plan
+            ui.vertical(|ui| {
+                motion_planning.create_plan = ui.button("New Plan").clicked();
+                let edit_plan = ui.button("Edit Plan").clicked();
+                    if edit_plan { motion_planning.edit_plan_open = true; }
+                column_rects.push((ui.min_rect(), "Plan"));
+            });
+            // TODO: Kinematics
+            ui.vertical(|ui| {
+
+            });
+        });
+
+    finish_ribbon_tab!(ui, column_rects);
     Ok(())
 }
 

@@ -117,9 +117,7 @@ pub fn ribbon_ui(
             RibbonTab::MotionPlanning => {
                 motion_planning_ui(
                     ui,
-                    &mut selected_entities,
                     &mut ui_resources,
-                    ribbon_height,
                 )
             }
             _ => { Ok(()) }
