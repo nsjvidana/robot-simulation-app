@@ -1,6 +1,5 @@
-use std::sync::{Arc, Mutex};
-use bevy::prelude::*;
 use crate::prelude::*;
+use bevy::prelude::*;
 
 pub struct MotionPlanningPlugin;
 

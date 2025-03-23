@@ -59,6 +59,7 @@ pub fn ribbon_ui(
     mut ribbon: ResMut<Ribbon>,
     mut selected_entities: ResMut<SelectedEntities>,
     mut ui_resources: UiResources,
+    mut create_plan_event: EventWriter<CreatePlanEvent>,
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
@@ -118,6 +119,8 @@ pub fn ribbon_ui(
                 motion_planning_ui(
                     ui,
                     &mut ui_resources,
+                    &mut create_plan_event,
+                    &selected_entities,
                 )
             }
             _ => { Ok(()) }
@@ -166,6 +169,7 @@ use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 pub(crate) use finish_ribbon_tab;
 use crate::error::ErrorEvent;
+use crate::motion_planning::CreatePlanEvent;
 
 fn general_tab(
     ui: &mut Ui,

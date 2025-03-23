@@ -1,7 +1,8 @@
 use crate::kinematics::ik::{ForwardDescentCyclic, KinematicNode};
+use crate::motion_planning::CreatePlanEvent;
 use crate::prelude::*;
 use crate::ui::{ribbon::{finish_ribbon_tab, finish_ui_section_vertical}, EntitySelectionMode, SelectedEntities, UiResources};
-use bevy::prelude::{Commands, Or, Query, With};
+use bevy::prelude::{default, Commands, EventWriter, Or, Query, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Layout, Separator, Ui, UiBuilder};
 use bevy_rapier3d::prelude::{
@@ -14,16 +15,9 @@ use std::ops::DerefMut;
 #[derive(Default)]
 pub struct MotionPlanning {
     ik_window: InverseKinematicsWindow,
-    create_plan: bool,
     edit_plan_open: bool,
     //RRT?
     //Vehicle controller?
-}
-
-impl MotionPlanning {
-    pub fn clear_clicks(&mut self) {
-        self.create_plan = false;
-    }
 }
 
 pub struct InverseKinematicsWindow {
@@ -60,27 +54,41 @@ pub enum IKSolverType {
 pub fn motion_planning_ui(
     ui: &mut Ui,
     ui_resources: &mut UiResources,
+    create_plan_event: &mut EventWriter<CreatePlanEvent>,
+    selected_entities: &SelectedEntities,
 ) -> Result<()> {
     let motion_planning = ui_resources.motion_planning.deref_mut();
-    motion_planning.clear_clicks();
 
     let num_cols = 2;
     let mut column_rects = Vec::with_capacity(num_cols);
     egui::Grid::new("planning_ribbon")
         .num_columns(num_cols)
-        .show(ui, |ui| {
+        .show(ui, |ui| -> Result<()> {
             // Plan
             ui.vertical(|ui| {
-                motion_planning.create_plan = ui.button("New Plan").clicked();
+                let create_plan = ui.button("New Plan").clicked();
                 let edit_plan = ui.button("Edit Plan").clicked();
-                    if edit_plan { motion_planning.edit_plan_open = true; }
+
+                if create_plan {
+                    if selected_entities.active_robot.is_none() {
+                        return Err(Error::FailedOperation("Create Plan failed: No robot selected!".to_string()));
+                    }
+                    create_plan_event.send(CreatePlanEvent {
+                        robot_entity: selected_entities.active_robot.unwrap(),
+                        plan: default()
+                    });
+                    motion_planning.edit_plan_open = true;
+                }
+                if edit_plan { motion_planning.edit_plan_open = true; }
                 column_rects.push((ui.min_rect(), "Plan"));
-            });
+                Ok(())
+            }).inner?;
             // TODO: Kinematics
             ui.vertical(|ui| {
 
             });
-        });
+            Ok(())
+        }).inner?;
 
     finish_ribbon_tab!(ui, column_rects);
     Ok(())
