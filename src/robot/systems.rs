@@ -362,7 +362,13 @@ pub fn init_robots(
         });
         commands
             .entity(robot_entity)
-            .insert((RobotHandle(robot_idx), RapierRobotHandles(handles)))
+            .insert((
+                RobotHandle(robot_idx),
+                RapierRobotHandles(handles),
+                RobotKinematics {
+                    chain: k::Chain::from(robot.urdf.clone()),
+                },
+            ))
             .insert_if_new(Transform::default());
     }
 }

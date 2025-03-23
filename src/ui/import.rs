@@ -49,7 +49,6 @@ impl RobotImporting {
                 Name::new(robot_name),
             ));
         }
-
         Ok(())
     }
 }

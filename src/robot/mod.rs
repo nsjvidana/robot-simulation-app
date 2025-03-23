@@ -6,6 +6,7 @@ use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use crate::math::Real;
 
 pub mod systems;
 
@@ -84,6 +85,11 @@ impl Default for RobotJointType {
     fn default() -> Self {
         Self::ImpulseJoints
     }
+}
+
+#[derive(Component)]
+pub struct RobotKinematics {
+    pub chain: k::Chain<Real>,
 }
 
 #[derive(Serialize, Deserialize)]
