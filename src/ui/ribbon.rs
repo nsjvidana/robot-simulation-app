@@ -2,11 +2,11 @@ use std::fmt::Display;
 use crate::prelude::*;
 use crate::ui::import::{import_ui, import_window, RobotImporting};
 use crate::ui::motion_planning::{
-    ik_window, motion_planning_ui, MotionPlanning,
+    ik_window, MotionPlanning,
 };
 use crate::ui::position_tools::{position_tools_ui, PositionTools};
 use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
-use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiGizmoGroup, UiResources};
+use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiEvents, UiGizmoGroup, UiResources, View};
 use bevy::input::ButtonInput;
 use bevy::prelude::{Commands, EventWriter, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::egui;
@@ -57,9 +57,8 @@ pub(crate) use finish_ui_section_vertical;
 pub fn ribbon_ui(
     mut ctxs: EguiContexts,
     mut ribbon: ResMut<Ribbon>,
-    mut selected_entities: ResMut<SelectedEntities>,
     mut ui_resources: UiResources,
-    mut create_plan_event: EventWriter<CreatePlanEvent>,
+    mut ui_events: UiEvents,
     ui_assets: Res<RobotLabUiAssets>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
@@ -106,7 +105,6 @@ pub fn ribbon_ui(
                 general_tab(
                     ui,
                     &mut ui_resources,
-                    &mut selected_entities,
                     &scene_window_data,
                     &transform_q,
                     &mut gizmos,
@@ -116,12 +114,8 @@ pub fn ribbon_ui(
                 Ok(())
             }
             RibbonTab::MotionPlanning => {
-                motion_planning_ui(
-                    ui,
-                    &mut ui_resources,
-                    &mut create_plan_event,
-                    &selected_entities,
-                )
+                ui_resources.motion_planning.ui(ui);
+                Ok(())
             }
             _ => { Ok(()) }
         }
@@ -147,9 +141,9 @@ pub fn ribbon_ui(
     }
 
     if ctxs.ctx_mut().is_using_pointer() {
-        selected_entities.pointer_usage_state = PointerUsageState::UiUsingPointer;
+        ui_resources.selected_entities.pointer_usage_state = PointerUsageState::UiUsingPointer;
     } else {
-        selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
+        ui_resources.selected_entities.pointer_usage_state = PointerUsageState::NotUsed;
     }
 }
 
@@ -174,7 +168,6 @@ use crate::motion_planning::CreatePlanEvent;
 fn general_tab(
     ui: &mut Ui,
     ui_resources: &mut UiResources,
-    selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
     transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>,
@@ -188,7 +181,6 @@ fn general_tab(
         rects.push(position_tools_ui(
             ui,
             ui_resources,
-            selected_entities,
             scene_window_data,
             transform_q,
             gizmos,
@@ -224,16 +216,9 @@ fn motion_planning_windows(
 pub fn ribbon_functionality(
     mut commands: Commands,
     ribbon: Res<Ribbon>,
-    mut selected_entities: ResMut<SelectedEntities>,
     mut transform_q: Query<&mut GlobalTransform>,
     mut ui_resources: UiResources,
-    robot_q: Query<(&Robot, &RapierRobotHandles)>,
-    joint_q: Query<
-        (
-            Option<&RapierImpulseJointHandle>, Option<&RapierMultibodyJointHandle>, Option<&KinematicNode>,
-        ),
-        Or<(With<RapierImpulseJointHandle>, With<RapierMultibodyJointHandle>,)>,
-    >,
+    mut ui_events: UiEvents,
     scene_window_data: Res<SceneWindowData>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
 
@@ -244,7 +229,7 @@ pub fn ribbon_functionality(
             ui_resources.position_tools.functionality(
                 &mut ui_resources.simulation,
                 &scene_window_data,
-                &mut selected_entities,
+                &mut ui_resources.selected_entities,
                 &mut transform_q,
                 mouse_button_input.just_released(MouseButton::Left),
                 mouse_button_input.pressed(MouseButton::Left),
@@ -253,8 +238,10 @@ pub fn ribbon_functionality(
             Ok(())
         }(),
         RibbonTab::MotionPlanning => || -> Result<()> {
-
-            Ok(())
+            MotionPlanning::functionality(
+                &mut ui_resources,
+                &mut ui_events,
+            )
         }(),
         _ => { Ok(()) }
     };

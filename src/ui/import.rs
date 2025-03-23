@@ -9,7 +9,7 @@ use bevy_rapier3d::parry::math::{Isometry, Vector};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::fmt::Display;
 use std::path::PathBuf;
-use crate::ui::{UiResources, View};
+use crate::ui::{UiEvents, UiResources, View};
 
 #[derive(Resource)]
 pub struct RobotImporting {
@@ -135,6 +135,9 @@ impl View for RobotImporting {
                     );
                 });
         });
+    }
+    fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
+        todo!()
     }
 }
 

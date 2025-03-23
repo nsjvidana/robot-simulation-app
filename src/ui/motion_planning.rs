@@ -1,20 +1,90 @@
 use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::motion_planning::CreatePlanEvent;
 use crate::prelude::*;
-use crate::ui::{ribbon::finish_ribbon_tab, SelectedEntities, UiResources};
+use crate::ui::{ribbon::finish_ribbon_tab, SelectedEntities, UiEvents, UiResources, View};
 use bevy::prelude::{default, EventWriter};
 use bevy_egui::egui;
-use bevy_egui::egui::{Align, Layout, Ui, UiBuilder};
+use bevy_egui::egui::{Align, Id, Layout, Response, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 
 #[derive(Default)]
 pub struct MotionPlanning {
-    ik_window: InverseKinematicsWindow,
+    responses: Vec<Response>,
+    ui_elems: UIElements,
     edit_plan_open: bool,
+    ik_window: InverseKinematicsWindow,
     //RRT?
     //Vehicle controller?
+}
+
+impl MotionPlanning {
+    const NEW_PLAN: &'static str = "New Plan";
+    const EDIT_PLAN: &'static str = "Edit Plan";
+}
+
+impl View for MotionPlanning {
+    fn ui(&mut self, ui: &mut Ui) {
+        self.responses.clear();
+
+        let num_cols = 2;
+        let mut column_rects = Vec::with_capacity(num_cols);
+        egui::Grid::new("planning_ribbon")
+            .num_columns(num_cols)
+            .show(ui, |ui| {
+                // Plan
+                ui.vertical(|ui| {
+                    let new_plan = ui.button(Self::NEW_PLAN);
+                        self.ui_elems.new_plan = Some(new_plan.id);
+                    let edit_plan = ui.button(Self::EDIT_PLAN);
+                        self.ui_elems.edit_plan = Some(edit_plan.id);
+                    self.responses.append(&mut vec![new_plan, edit_plan]);
+                    column_rects.push((ui.min_rect(), "Plan"));
+                });
+                // TODO: Kinematics
+                ui.vertical(|ui| {
+
+                });
+            });
+
+        finish_ribbon_tab!(ui, column_rects);
+    }
+
+    fn functionality(
+        resources: &mut UiResources,
+        events: &mut UiEvents,
+    ) -> Result<()> {
+        let motion_planning = resources.motion_planning.deref_mut();
+        let create_plan = motion_planning.responses
+            .iter()
+            .find(|v| v.id == motion_planning.ui_elems.new_plan.unwrap())
+            .is_some_and(|btn| btn.clicked());
+        let edit_plan = motion_planning.responses
+            .iter()
+            .find(|v| v.id == motion_planning.ui_elems.edit_plan.unwrap())
+            .is_some_and(|btn| btn.clicked());
+
+        let selected_entities = resources.selected_entities.deref_mut();
+        if create_plan {
+            if selected_entities.active_robot.is_none() {
+                return Err(Error::FailedOperation("Create Plan failed: No robot selected!".to_string()));
+            }
+            events.create_plan_event.send(CreatePlanEvent {
+                robot_entity: selected_entities.active_robot.unwrap(),
+                plan: default()
+            });
+            motion_planning.edit_plan_open = true;
+        }
+        if edit_plan { motion_planning.edit_plan_open = true; }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct UIElements {
+    new_plan: Option<Id>,
+    edit_plan: Option<Id>,
 }
 
 pub struct InverseKinematicsWindow {
@@ -48,47 +118,11 @@ pub enum IKSolverType {
     Cyclic,
 }
 
-pub fn motion_planning_ui(
-    ui: &mut Ui,
-    ui_resources: &mut UiResources,
+pub fn motion_planning_functionality(
     create_plan_event: &mut EventWriter<CreatePlanEvent>,
     selected_entities: &SelectedEntities,
-) -> Result<()> {
-    let motion_planning = ui_resources.motion_planning.deref_mut();
+) {
 
-    let num_cols = 2;
-    let mut column_rects = Vec::with_capacity(num_cols);
-    egui::Grid::new("planning_ribbon")
-        .num_columns(num_cols)
-        .show(ui, |ui| -> Result<()> {
-            // Plan
-            ui.vertical(|ui| {
-                let create_plan = ui.button("New Plan").clicked();
-                let edit_plan = ui.button("Edit Plan").clicked();
-
-                if create_plan {
-                    if selected_entities.active_robot.is_none() {
-                        return Err(Error::FailedOperation("Create Plan failed: No robot selected!".to_string()));
-                    }
-                    create_plan_event.send(CreatePlanEvent {
-                        robot_entity: selected_entities.active_robot.unwrap(),
-                        plan: default()
-                    });
-                    motion_planning.edit_plan_open = true;
-                }
-                if edit_plan { motion_planning.edit_plan_open = true; }
-                column_rects.push((ui.min_rect(), "Plan"));
-                Ok(())
-            }).inner?;
-            // TODO: Kinematics
-            ui.vertical(|ui| {
-
-            });
-            Ok(())
-        }).inner?;
-
-    finish_ribbon_tab!(ui, column_rects);
-    Ok(())
 }
 
 pub fn ik_window(egui_ctx: &mut egui::Context, ui_resources: &mut UiResources) {

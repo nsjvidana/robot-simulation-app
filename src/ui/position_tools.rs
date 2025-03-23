@@ -283,7 +283,6 @@ impl Default for PositionTool {
 pub fn position_tools_ui(
     ui: &mut Ui,
     ui_resources: &mut UiResources,
-    selected_entities: &mut SelectedEntities,
     scene_window_data: &SceneWindowData,
     transform_q: &Query<&GlobalTransform>,
     gizmos: &mut Gizmos<UiGizmoGroup>,
@@ -291,6 +290,7 @@ pub fn position_tools_ui(
     let UiResources {
         position_tools,
         simulation: physics_sim,
+        selected_entities,
         ..
     } = ui_resources;
 
