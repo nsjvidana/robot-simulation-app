@@ -1,12 +1,7 @@
 use std::fmt::Display;
 use crate::prelude::*;
-use crate::ui::import::{import_ui, import_window, RobotImporting};
-use crate::ui::motion_planning::{
-    ik_window, MotionPlanning,
-};
-use crate::ui::position_tools::{position_tools_ui, PositionTools};
-use crate::ui::simulation::{simulation_control_window, simulation_ribbon_ui, PhysicsSimulation};
-use crate::ui::{PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiEvents, UiGizmoGroup, UiResources, View};
+use crate::ui::motion_planning::MotionPlanning;
+use crate::ui::{GizmosUi, GizmosUiParameters, PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiEvents, UiGizmoGroup, UiResources, View, WindowUI};
 use bevy::input::ButtonInput;
 use bevy::prelude::{Commands, EventWriter, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::egui;
@@ -58,12 +53,8 @@ pub fn ribbon_ui(
     mut ctxs: EguiContexts,
     mut ribbon: ResMut<Ribbon>,
     mut ui_resources: UiResources,
-    mut ui_events: UiEvents,
+    mut gizmos_resources: GizmosUiParameters,
     ui_assets: Res<RobotLabUiAssets>,
-    scene_window_data: Res<SceneWindowData>,
-    transform_q: Query<&GlobalTransform>,
-    mut gizmos: Gizmos<UiGizmoGroup>,
-
     mut errors: EventWriter<ErrorEvent>
 ) {
     // Ribbon
@@ -102,19 +93,11 @@ pub fn ribbon_ui(
         let ribbon_height = ui.max_rect().height() - tabs_rect.height();
         match ribbon.tab {
             RibbonTab::General => {
-                general_tab(
-                    ui,
-                    &mut ui_resources,
-                    &scene_window_data,
-                    &transform_q,
-                    &mut gizmos,
-                    &ui_assets,
-                    ribbon_height,
-                );
+                ui_resources.general_tab.ui(ui, &ui_assets);
                 Ok(())
             }
             RibbonTab::MotionPlanning => {
-                ui_resources.motion_planning.ui(ui);
+                ui_resources.motion_planning_tab.ui(ui, &ui_assets);
                 Ok(())
             }
             _ => { Ok(()) }
@@ -127,10 +110,24 @@ pub fn ribbon_ui(
         });
     }
 
+    // Gizmos UI
+    match ribbon.tab {
+        RibbonTab::General => {
+            GeneralTab::gizmos_ui(&mut ui_resources, &mut gizmos_resources)
+        }
+        RibbonTab::MotionPlanning => {
+
+        }
+        RibbonTab::Fluids => {
+
+        }
+    }
+
     // UI windows
+    let egui_ctx = ctxs.ctx_mut();
     let result = match ribbon.tab {
-        RibbonTab::General => Ok(general_windows(ctxs.ctx_mut(), &mut ui_resources)),
-        RibbonTab::MotionPlanning => Ok(motion_planning_windows(ctxs.ctx_mut(), &mut ui_resources)),
+        RibbonTab::General => Ok(ui_resources.general_tab.window_ui(egui_ctx, &ui_assets)),
+        RibbonTab::MotionPlanning => Ok(ui_resources.motion_planning_tab.window_ui(egui_ctx, &ui_assets)),
         _ => {Ok(())}
     };
     if let Err(error) = result {
@@ -150,10 +147,10 @@ pub fn ribbon_ui(
 /// Finish ribbon tab by adding the names of each section
 macro_rules! finish_ribbon_tab {
     ($ui:expr, $rects:expr) => {
-        $ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+        $ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
             for (mut rect, section_name) in $rects {
                 rect.max.y = ui.max_rect().max.y;
-                ui.allocate_new_ui(UiBuilder::new().max_rect(rect), |ui| ui.label(section_name));
+                ui.allocate_new_ui(egui::UiBuilder::new().max_rect(rect), |ui| ui.label(section_name));
             }
         });
     };
@@ -164,79 +161,22 @@ use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 pub(crate) use finish_ribbon_tab;
 use crate::error::ErrorEvent;
 use crate::motion_planning::CreatePlanEvent;
-
-fn general_tab(
-    ui: &mut Ui,
-    ui_resources: &mut UiResources,
-    scene_window_data: &SceneWindowData,
-    transform_q: &Query<&GlobalTransform>,
-    gizmos: &mut Gizmos<UiGizmoGroup>,
-    ui_assets: &RobotLabUiAssets,
-    ribbon_height: f32,
-) {
-    let mut rects = Vec::new();
-    ui.horizontal(|ui| {
-        rects.push(import_ui(ui, ui_resources));
-        ui.add(egui::Separator::default().grow(ribbon_height));
-        rects.push(position_tools_ui(
-            ui,
-            ui_resources,
-            scene_window_data,
-            transform_q,
-            gizmos,
-        ));
-        ui.add(egui::Separator::default().grow(ribbon_height));
-        rects.push(simulation_ribbon_ui(ui, ui_resources, &ui_assets));
-        ui.add(egui::Separator::default().grow(ribbon_height));
-    });
-
-    finish_ribbon_tab!(ui, rects);
-}
-
-fn general_windows(
-    egui_ctx: &mut egui::Context,
-    resources: &mut UiResources
-) {
-    let UiResources {
-        simulation,
-        import,
-        ..
-    } = resources;
-    simulation_control_window(egui_ctx, simulation);
-    import_window(egui_ctx, import);
-}
-
-fn motion_planning_windows(
-    egui_ctx: &mut egui::Context,
-    resources: &mut UiResources,
-) {
-    ik_window(egui_ctx, resources);
-}
+use crate::ui::general::GeneralTab;
 
 pub fn ribbon_functionality(
-    mut commands: Commands,
     ribbon: Res<Ribbon>,
-    mut transform_q: Query<&mut GlobalTransform>,
     mut ui_resources: UiResources,
+    mut gizmos_resources: GizmosUiParameters,
     mut ui_events: UiEvents,
-    scene_window_data: Res<SceneWindowData>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
 
     mut errors: EventWriter<ErrorEvent>,
 ) {
     let result = match ribbon.tab {
-        RibbonTab::General => || -> Result<()> {
-            ui_resources.position_tools.functionality(
-                &mut ui_resources.simulation,
-                &scene_window_data,
-                &mut ui_resources.selected_entities,
-                &mut transform_q,
-                mouse_button_input.just_released(MouseButton::Left),
-                mouse_button_input.pressed(MouseButton::Left),
-            )?;
-            ui_resources.import.functionality(&mut commands)?;
-            Ok(())
-        }(),
+        RibbonTab::General =>
+            GeneralTab::functionality(
+                &mut ui_resources,
+                &mut ui_events
+            ),
         RibbonTab::MotionPlanning => || -> Result<()> {
             MotionPlanning::functionality(
                 &mut ui_resources,
@@ -244,6 +184,21 @@ pub fn ribbon_functionality(
             )
         }(),
         _ => { Ok(()) }
+    };
+    if let Err(error) = result {
+        errors.send(ErrorEvent {
+            error,
+            location: Some(ribbon.tab.to_string())
+        });
+    }
+
+    // Gizmos functionality
+    let result = match ribbon.tab {
+        RibbonTab::General => {
+            GeneralTab::gizmos_functionality(&mut ui_resources, &mut gizmos_resources, &mut ui_events)
+        }
+        RibbonTab::MotionPlanning => {Ok(())}
+        RibbonTab::Fluids => {Ok(())}
     };
     if let Err(error) = result {
         errors.send(ErrorEvent {

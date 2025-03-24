@@ -1,6 +1,5 @@
 use crate::convert::IntoBevy;
 use crate::prelude::*;
-use crate::ui::import::RobotImporting;
 use bevy::prelude::{Changed, GlobalTransform, Mut, Res, ResMut};
 use bevy::ptr::UnsafeCellDeref;
 use bevy::{
@@ -94,7 +93,6 @@ macro_rules! rapier_rb_to_components {
 
 pub fn init_robots(
     mut commands: Commands,
-    importing: Res<RobotImporting>,
     mut robot_q: Query<
         (
             Entity,
@@ -122,7 +120,7 @@ pub fn init_robots(
         let handles: Result<UrdfRobotHandles<Option<Index>>> = (|| unsafe {
             let mut urdf_robot = UrdfRobot::from_robot(
                 &urdf_rs_robot_to_xurdf(robot.urdf.clone()),
-                importing.urdf_loader_options.clone(),
+                robot.urdf_loader_options.clone(),
                 robot
                     .mesh_dir
                     .clone()

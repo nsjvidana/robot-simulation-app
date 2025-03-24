@@ -3,7 +3,7 @@ use bevy::app::App;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use bevy_rapier3d::rapier::data::{Arena, Index};
-use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
+use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
@@ -51,15 +51,22 @@ pub struct Robot {
     pub mesh_dir: Option<PathBuf>,
     pub robot_joint_type: RobotJointType,
     pub robot_file_path: PathBuf,
+    pub urdf_loader_options: UrdfLoaderOptions,
 }
 
 impl Robot {
-    pub fn new(robot: urdf_rs::Robot, path: PathBuf, mesh_dir: Option<PathBuf>) -> Self {
+    pub fn new(
+        robot: urdf_rs::Robot,
+        urdf_loader_options: UrdfLoaderOptions,
+        path: PathBuf,
+        mesh_dir: Option<PathBuf>
+    ) -> Self {
         Self {
             urdf: robot,
             mesh_dir,
             robot_joint_type: RobotJointType::ImpulseJoints,
             robot_file_path: path,
+            urdf_loader_options,
         }
     }
 

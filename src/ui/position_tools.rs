@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use crate::prelude::*;
 use crate::math::{compute_intersection_pos, Real};
 use crate::ui::ribbon::finish_ui_section_vertical;
@@ -246,7 +246,6 @@ impl GizmosUi for PositionTools {
         &mut GizmosUiParameters,
     ) {
         let UiResources {
-            simulation: physics_sim,
             scene_window_data,
             selected_entities,
             ..
@@ -256,6 +255,7 @@ impl GizmosUi for PositionTools {
             global_transform_q,
             ..
         } = gizmos_resources;
+        let physics_sim = ui_resources.general_tab.simulation.deref();
 
         // Don't draw gizmos when sim is active.
         if physics_sim.physics_active {
@@ -348,12 +348,12 @@ impl GizmosUi for PositionTools {
         gizmos_resources: &mut GizmosUiParameters,
     ) -> Result<()> {
         let UiResources {
-            simulation: physics_sim,
             scene_window_data,
             selected_entities,
-            position_tools,
             ..
         } = ui_resources;
+        let position_tools = ui_resources.general_tab.position_tools.deref_mut();
+        let physics_sim = ui_resources.general_tab.simulation.deref();
         let global_transform_q = &mut gizmos_resources.global_transform_q;
         let (mouse_pressed, mouse_just_released) = (selected_entities.mouse_pressed, selected_entities.mouse_just_released);
 
@@ -368,7 +368,6 @@ impl GizmosUi for PositionTools {
             selected_tool,
             gizmos_origin,
             gizmos_axes,
-            local_coords,
             init_robot_transform,
             grab_shape,
             rotate_shape_outer,

@@ -1,8 +1,6 @@
-pub mod import;
+pub mod general;
 pub mod motion_planning;
-pub mod position_tools;
 pub mod ribbon;
-pub mod simulation;
 
 use crate::kinematics::ik::{ForwardAscentCyclic, ForwardDescentCyclic};
 use crate::math::ray_scale_for_plane_intersect_local;
@@ -34,22 +32,23 @@ use k::{InverseKinematicsSolver, SerialChain};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
+use general::import::Import;
+use general::simulation::Simulation;
+use crate::general::{ImportEvent, SimulationEvent};
 use crate::motion_planning::CreatePlanEvent;
-use crate::ui::import::RobotImporting;
+use crate::ui::general::GeneralTab;
 use crate::ui::motion_planning::MotionPlanning;
-use crate::ui::position_tools::PositionTools;
-use crate::ui::simulation::PhysicsSimulation;
+
+pub const TOOLTIP_LAYER: &'static str = "egui tooltips";
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
-    physics_schedule: Interned<dyn ScheduleLabel>,
 }
 
 impl RobotLabUiPlugin {
-    pub fn new(schedule: impl ScheduleLabel, physics_schedule: impl ScheduleLabel) -> Self {
+    pub fn new(schedule: impl ScheduleLabel) -> Self {
         Self {
             schedule: schedule.intern(),
-            physics_schedule: physics_schedule.intern(),
         }
     }
 }
@@ -67,12 +66,13 @@ impl Plugin for RobotLabUiPlugin {
         app.init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
             .init_resource::<RobotLabUiAssets>()
-            .init_resource::<ribbon::Ribbon>()
-            .init_resource::<import::RobotImporting>()
-            .init_resource::<position_tools::PositionTools>()
-            .init_resource::<simulation::PhysicsSimulation>();
+            .init_resource::<Import>()
+            .init_resource::<general::position_tools::PositionTools>()
+            .init_resource::<Simulation>()
 
-        app.init_non_send_resource::<motion_planning::MotionPlanning>();
+            .init_resource::<ribbon::Ribbon>();
+
+        app.init_non_send_resource::<MotionPlanning>();
 
         // Make all UI gizmos draw on top of everything
         app.init_gizmo_group::<UiGizmoGroup>();
@@ -94,21 +94,14 @@ impl Plugin for RobotLabUiPlugin {
             )
                 .chain(),
         );
-        app.add_systems(
-            self.physics_schedule,
-            simulation::control_simulation
-                .before(PhysicsSet::StepSimulation)
-                .after(PhysicsSet::SyncBackend),
-        );
     }
 }
 
 #[derive(SystemParam)]
 pub struct UiResources<'w> {
-    import: ResMut<'w, RobotImporting>,
-    position_tools: ResMut<'w, PositionTools>,
-    simulation: ResMut<'w, PhysicsSimulation>,
-    motion_planning: NonSendMut<'w, MotionPlanning>,
+    general_tab: GeneralTab<'w>,
+    motion_planning_tab: NonSendMut<'w, MotionPlanning>,
+
     selected_entities: ResMut<'w, SelectedEntities>,
     scene_window_data: Res<'w, SceneWindowData>,
 }
@@ -123,10 +116,13 @@ pub struct GizmosUiParameters<'w, 's> {
 #[derive(SystemParam)]
 pub struct UiEvents<'w> {
     create_plan_event: EventWriter<'w, CreatePlanEvent>,
+    import_events: EventWriter<'w, ImportEvent>,
+    simulation_events: EventWriter<'w, SimulationEvent>,
 }
 
 pub trait View {
-    fn ui(&mut self, ui: &mut Ui);
+    fn ui(&mut self, ui: &mut Ui, ui_assets: &RobotLabUiAssets);
+
     fn functionality(
         resources: &mut UiResources,
         events: &mut UiEvents,
@@ -134,16 +130,20 @@ pub trait View {
 }
 
 pub trait GizmosUi {
-    fn ui(
-        &mut self,
+    fn gizmos_ui(
         ui_resources: &mut UiResources,
         gizmos_resources: &mut GizmosUiParameters,
     );
 
-    fn functionality(
+    fn gizmos_functionality(
         ui_resources: &mut UiResources,
         gizmos_resources: &mut GizmosUiParameters,
-    ) -> Result<()> ;
+        events: &mut UiEvents,
+    ) -> Result<()>;
+}
+
+pub trait WindowUI {
+    fn window_ui(&mut self, egui_ctx: &mut egui::Context, ui_assets: &RobotLabUiAssets);
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -324,7 +324,6 @@ pub fn select_entities(
     mut selected_entities: ResMut<SelectedEntities>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
-    rapier_context: ReadDefaultRapierContext,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     robot_q: Query<&Robot>,

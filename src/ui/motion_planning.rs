@@ -1,10 +1,10 @@
 use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::motion_planning::CreatePlanEvent;
 use crate::prelude::*;
-use crate::ui::{ribbon::finish_ribbon_tab, SelectedEntities, UiEvents, UiResources, View};
-use bevy::prelude::{default, EventWriter};
+use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, SelectedEntities, UiEvents, UiResources, View, WindowUI};
+use bevy::prelude::{default, EventWriter, Resource};
 use bevy_egui::egui;
-use bevy_egui::egui::{Align, Id, Layout, Response, Ui, UiBuilder};
+use bevy_egui::egui::{Align, Context, Id, Layout, Response, Ui, UiBuilder};
 use openrr_planner::JointPathPlanner;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -25,7 +25,7 @@ impl MotionPlanning {
 }
 
 impl View for MotionPlanning {
-    fn ui(&mut self, ui: &mut Ui) {
+    fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
         self.responses.clear();
 
         let num_cols = 2;
@@ -55,7 +55,7 @@ impl View for MotionPlanning {
         resources: &mut UiResources,
         events: &mut UiEvents,
     ) -> Result<()> {
-        let motion_planning = resources.motion_planning.deref_mut();
+        let motion_planning = resources.motion_planning_tab.deref_mut();
         let create_plan = motion_planning.responses
             .iter()
             .find(|v| v.id == motion_planning.ui_elems.new_plan.unwrap())
@@ -81,6 +81,12 @@ impl View for MotionPlanning {
     }
 }
 
+impl WindowUI for MotionPlanning {
+    fn window_ui(&mut self, egui_ctx: &mut Context, ui_assets: &RobotLabUiAssets) {
+        self.ik_window.window_ui(egui_ctx, ui_assets);
+    }
+}
+
 #[derive(Default)]
 pub struct UIElements {
     new_plan: Option<Id>,
@@ -97,6 +103,63 @@ pub struct InverseKinematicsWindow {
     planner: Option<JointPathPlanner<Real>>,
     selected_chain: Option<k::Chain<Real>>,
     create_ik_chain: bool,
+}
+
+impl View for InverseKinematicsWindow {
+    fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+        let solver_dropdown = egui::ComboBox::from_label("Solver Type")
+            .selected_text(match &self.selected_solver {
+                IKSolverType::Jacobian => "Jacobian",
+                IKSolverType::Cyclic => "Cyclic",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut self.selected_solver,
+                    IKSolverType::Jacobian,
+                    "Jacobian",
+                );
+                ui.selectable_value(
+                    &mut self.selected_solver,
+                    IKSolverType::Cyclic,
+                    "Cyclic",
+                );
+            });
+        if solver_dropdown.response.clicked() {
+            match self.selected_solver {
+                IKSolverType::Jacobian => {
+                    self.solvers.insert(
+                        IKSolverType::Jacobian,
+                        Box::new(k::JacobianIkSolver::default()) as _,
+                    );
+                }
+                IKSolverType::Cyclic => {
+                    self.solvers.insert(
+                        IKSolverType::Cyclic,
+                        Box::new(ForwardDescentCyclic::default()) as _,
+                    );
+                }
+            }
+        }
+
+        self.create_ik_chain = ui.button("Create IK Chain").clicked();
+    }
+
+    fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
+        todo!()
+    }
+}
+
+impl WindowUI for InverseKinematicsWindow {
+    fn window_ui(&mut self, egui_ctx: &mut Context, ui_assets: &RobotLabUiAssets) {
+        let mut open = self.open;
+        egui::Window::new("Inverse Kinematcs")
+            .open(&mut open)
+            .show(egui_ctx, |ui| {
+                self.ui(ui, ui_assets)
+            });
+        // Avoid borrow checker error
+        self.open = open;
+    }
 }
 
 impl Default for InverseKinematicsWindow {
@@ -116,54 +179,4 @@ impl Default for InverseKinematicsWindow {
 pub enum IKSolverType {
     Jacobian,
     Cyclic,
-}
-
-pub fn motion_planning_functionality(
-    create_plan_event: &mut EventWriter<CreatePlanEvent>,
-    selected_entities: &SelectedEntities,
-) {
-
-}
-
-pub fn ik_window(egui_ctx: &mut egui::Context, ui_resources: &mut UiResources) {
-    let ik_window = &mut ui_resources.motion_planning.ik_window;
-    egui::Window::new("Inverse Kinematcs")
-        .open(&mut ik_window.open)
-        .show(egui_ctx, |ui| {
-            let solver_dropdown = egui::ComboBox::from_label("Solver Type")
-                .selected_text(match &ik_window.selected_solver {
-                    IKSolverType::Jacobian => "Jacobian",
-                    IKSolverType::Cyclic => "Cyclic",
-                })
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut ik_window.selected_solver,
-                        IKSolverType::Jacobian,
-                        "Jacobian",
-                    );
-                    ui.selectable_value(
-                        &mut ik_window.selected_solver,
-                        IKSolverType::Cyclic,
-                        "Cyclic",
-                    );
-                });
-            if solver_dropdown.response.clicked() {
-                match ik_window.selected_solver {
-                    IKSolverType::Jacobian => {
-                        ik_window.solvers.insert(
-                            IKSolverType::Jacobian,
-                            Box::new(k::JacobianIkSolver::default()) as _,
-                        );
-                    }
-                    IKSolverType::Cyclic => {
-                        ik_window.solvers.insert(
-                            IKSolverType::Cyclic,
-                            Box::new(ForwardDescentCyclic::default()) as _,
-                        );
-                    }
-                }
-            }
-
-            ik_window.create_ik_chain = ui.button("Create IK Chain").clicked();
-        });
 }

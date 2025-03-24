@@ -18,6 +18,8 @@ use bevy_rapier3d::{
 };
 use k::SerialChain;
 use std::ops::DerefMut;
+use bevy_egui::EguiSet;
+use crate::general::GeneralTabPlugin;
 use crate::motion_planning::MotionPlanningPlugin;
 
 pub mod convert;
@@ -29,6 +31,7 @@ pub mod robot;
 #[allow(clippy::too_many_arguments)]
 pub mod ui;
 pub mod motion_planning;
+mod general;
 
 fn main() {
     let mut app = App::new();
@@ -47,8 +50,9 @@ fn main() {
         // SalvaPhysicsPlugin::new(),
         WorldInspectorPlugin::default(),
         // EguiPlugin,
+        GeneralTabPlugin::new(FixedUpdate),
         MotionPlanningPlugin,
-        RobotLabUiPlugin::new(Update, FixedUpdate),
+        RobotLabUiPlugin::new(Update),
         RobotPlugin,
         NoCameraPlayerPlugin,
     ));

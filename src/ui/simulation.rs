@@ -69,7 +69,7 @@ pub fn simulation_ribbon_ui(
         );
         ui.label("Run Simulation");
         if btn.clicked() {
-            ui_resources.simulation.control_window_open = true;
+            ui_resources.general_tab.simulation.control_window_open = true;
         }
         finish_ui_section_vertical!(ui, "Simulation")
     });
