@@ -35,7 +35,10 @@ use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::cmp::Ordering;
 use std::ops::DerefMut;
 use crate::motion_planning::CreatePlanEvent;
+use crate::ui::import::RobotImporting;
 use crate::ui::motion_planning::MotionPlanning;
+use crate::ui::position_tools::PositionTools;
+use crate::ui::simulation::PhysicsSimulation;
 
 pub struct RobotLabUiPlugin {
     schedule: Interned<dyn ScheduleLabel>,
@@ -102,11 +105,19 @@ impl Plugin for RobotLabUiPlugin {
 
 #[derive(SystemParam)]
 pub struct UiResources<'w> {
-    import: ResMut<'w, import::RobotImporting>,
-    position_tools: ResMut<'w, position_tools::PositionTools>,
-    simulation: ResMut<'w, simulation::PhysicsSimulation>,
+    import: ResMut<'w, RobotImporting>,
+    position_tools: ResMut<'w, PositionTools>,
+    simulation: ResMut<'w, PhysicsSimulation>,
     motion_planning: NonSendMut<'w, MotionPlanning>,
     selected_entities: ResMut<'w, SelectedEntities>,
+    scene_window_data: Res<'w, SceneWindowData>,
+}
+
+#[derive(SystemParam)]
+pub struct GizmosUiParameters<'w, 's> {
+    gizmos: Gizmos<'w, 's, UiGizmoGroup>,
+    transform_q: Query<'w, 's, &'static mut Transform>,
+    global_transform_q: Query<'w, 's, &'static mut GlobalTransform>
 }
 
 #[derive(SystemParam)]
@@ -120,6 +131,19 @@ pub trait View {
         resources: &mut UiResources,
         events: &mut UiEvents,
     ) -> Result<()>;
+}
+
+pub trait GizmosUi {
+    fn ui(
+        &mut self,
+        ui_resources: &mut UiResources,
+        gizmos_resources: &mut GizmosUiParameters,
+    );
+
+    fn functionality(
+        ui_resources: &mut UiResources,
+        gizmos_resources: &mut GizmosUiParameters,
+    ) -> Result<()> ;
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -140,6 +164,8 @@ pub struct SelectedEntities {
     pub hovered_entities: Vec<Entity>,
     /// If the simulation viewport was clicked
     pub viewport_clicked: bool,
+    pub mouse_just_released: bool,
+    pub mouse_pressed: bool,
     pub pointer_usage_state: PointerUsageState,
 
     selection_root: Option<Entity>,
@@ -315,6 +341,8 @@ pub fn select_entities(
     let alt_pressed = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
     let shift_pressed =
         keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+    selected_entities.mouse_just_released = mouse.just_released(MouseButton::Left);
+    selected_entities.mouse_pressed = mouse.pressed(MouseButton::Left);
 
     // Selection visuals + getting selection entities
     let cam_pos = scene_window_data.camera_transform.translation();
