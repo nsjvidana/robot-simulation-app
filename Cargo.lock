@@ -4598,6 +4598,7 @@ dependencies = [
  "bincode",
  "k",
  "openrr-planner",
+ "parking_lot",
  "rapier3d-urdf",
  "rfd",
  "serde",

@@ -1,6 +1,6 @@
 mod ik;
 
-use crate::motion_planning::{Instruction, PlanEvent};
+use crate::motion_planning::{Instruction, InstructionObject, PlanEvent};
 use crate::prelude::*;
 use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
 use bevy::prelude::{default, Entity, ResMut, Resource};
@@ -79,6 +79,7 @@ impl View for MotionPlanning {
                 return Err(Error::FailedOperation("Create Plan failed: No robot selected!".to_string()));
             }
         }
+        // Opening the Edit Plan window
         else if edit_plan || motion_planning.edit_plan_window.open_in_next_frame {
             motion_planning.edit_plan_window.open_in_next_frame = false;
             if let Some(robot) = selected_entities.active_robot {
@@ -124,7 +125,7 @@ pub struct EditPlanWindow {
     /// Used when this window needs to appear upon creating a new plan
     open_in_next_frame: bool,
     pub target_robot: Entity,
-    pub instructions: Vec<(usize, &'static str)>,
+    pub instructions: Vec<(usize, InstructionObject)>,
 
     pub add_instruction_clicked: bool,
     pub remove_instruction_clicked: bool,
@@ -133,11 +134,12 @@ pub struct EditPlanWindow {
 }
 
 impl EditPlanWindow {
-    pub fn get_robot_data(&mut self, target_robot: Entity, instructions: &Vec<Box<dyn Instruction>>) {
+    pub fn get_robot_data(&mut self, target_robot: Entity, instructions: &Vec<InstructionObject>) {
         self.target_robot = target_robot;
-        self.instructions = instructions.iter()
+        self.instructions = instructions
+            .iter()
+            .cloned()
             .enumerate()
-            .map(|(i, v)| (i, (**v).instruction_name()))
             .collect();
     }
 }
@@ -170,11 +172,15 @@ impl View for EditPlanWindow {
         let mut to = None;
         let (_, dropped_payload) = ui.dnd_drop_zone::<usize, ()>(frame, |ui| {
             ui.vertical_centered(|ui| {
-                for (loc, instruction) in self.instructions.iter().map(|v| &v.1).enumerate() {
+                for (loc, instruction) in self.instructions
+                    .iter()
+                    .map(|v| v.1.lock().instruction_name())
+                    .enumerate()
+                {
                     let resp = ui.dnd_drag_source(
                         Id::new(loc),
                         loc,
-                        |ui| { let _ = ui.button(*instruction); },
+                        |ui| { let _ = ui.button(instruction); },
                     ).response;
 
                     // Detect items held over this item in the instructions list
