@@ -1,5 +1,6 @@
 use bevy_egui::egui::{Context, Ui};
 use std::collections::HashMap;
+use bevy_egui::egui;
 use openrr_planner::JointPathPlanner;
 use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::math::Real;
