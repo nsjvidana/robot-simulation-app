@@ -5,7 +5,7 @@ pub struct MotionPlanningPlugin;
 
 impl Plugin for MotionPlanningPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<CreatePlanEvent>();
+        app.add_event::<PlanEvent>();
 
         app.add_systems(PostUpdate, init_plans);
     }
@@ -23,20 +23,41 @@ pub trait Instruction: Send + Sync {
         rapier_handles: &RapierRobotHandles,
         robot_entities: &RobotEntities,
     );
+
+    fn instruction_name(&self) -> &'static str;
 }
 
 #[derive(Event)]
-pub struct CreatePlanEvent {
-    pub robot_entity: Entity,
-    pub plan: Plan,
+pub enum PlanEvent {
+    CreatePlanEvent {
+        robot_entity: Entity,
+        plan: Plan,
+    },
+    ReorderInstructions {
+        robot_entity: Entity,
+        instruction_order: Vec<usize>
+    }
 }
 
 pub fn init_plans(
     mut commands: Commands,
-    mut plan_creations: ResMut<Events<CreatePlanEvent>>,
+    mut plan_events: ResMut<Events<PlanEvent>>,
+    mut plans: Query<&mut Plan>
 ) {
-    for creation in plan_creations.drain() {
-        commands.entity(creation.robot_entity)
-            .insert(creation.plan);
+    for event in plan_events.drain() {
+        match event {
+            PlanEvent::CreatePlanEvent { robot_entity, plan } => {
+                commands.entity(robot_entity)
+                    .insert(plan);
+            },
+            PlanEvent::ReorderInstructions { robot_entity, instruction_order } => {
+                let instructions = &mut plans.get_mut(robot_entity).unwrap()
+                    .instructions;
+                *instructions = instruction_order.into_iter()
+                    .map(|v| instructions.remove(v))
+                    .collect();
+            }
+            _ => {}
+        }
     }
 }

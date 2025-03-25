@@ -1,8 +1,6 @@
 use crate::error::ErrorEvent;
 use crate::prelude::*;
-use bevy::prelude::{
-    ButtonInput, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With,
-};
+use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
 use bevy::{
     app::App,
     math::Vec3,
@@ -18,6 +16,8 @@ use bevy_rapier3d::{
 };
 use k::SerialChain;
 use std::ops::DerefMut;
+use std::sync::Arc;
+use bevy::app::PostUpdate;
 use bevy_egui::EguiSet;
 use crate::general::GeneralTabPlugin;
 use crate::motion_planning::MotionPlanningPlugin;
@@ -59,6 +59,12 @@ fn main() {
 
     app.add_systems(Startup, startup);
     app.add_systems(Update, update);
+
+    app.add_systems(PostUpdate, |mut events: EventReader<ErrorEvent>| {
+        for event in events.read() {
+            println!("{:?}", event.error);
+        }
+    });
 
     app.run();
 }

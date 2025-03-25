@@ -1,11 +1,11 @@
 mod ik;
 
-use crate::motion_planning::CreatePlanEvent;
+use crate::motion_planning::{Instruction, PlanEvent};
 use crate::prelude::*;
 use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
-use bevy::prelude::{default, Resource};
+use bevy::prelude::{default, Entity, ResMut, Resource};
 use bevy_egui::egui;
-use bevy_egui::egui::{Context, Id, Response, Ui};
+use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Ui};
 use std::ops::DerefMut;
 use ik::InverseKinematicsWindow;
 
@@ -15,6 +15,7 @@ pub struct MotionPlanning {
     ui_elems: UIElements,
     edit_plan_open: bool,
     ik_window: InverseKinematicsWindow,
+    edit_plan_window: EditPlanWindow,
     //RRT?
     //Vehicle controller?
 }
@@ -67,16 +68,39 @@ impl View for MotionPlanning {
 
         let selected_entities = resources.selected_entities.deref_mut();
         if create_plan {
-            if selected_entities.active_robot.is_none() {
+            if let Some(robot) = selected_entities.active_robot {
+                events.plan_events.send(PlanEvent::CreatePlanEvent {
+                    robot_entity: robot,
+                    plan: default()
+                });
+                motion_planning.edit_plan_window.open_in_next_frame = true;
+            }
+            else {
                 return Err(Error::FailedOperation("Create Plan failed: No robot selected!".to_string()));
             }
-            events.create_plan_event.send(CreatePlanEvent {
-                robot_entity: selected_entities.active_robot.unwrap(),
-                plan: default()
-            });
-            motion_planning.edit_plan_open = true;
         }
-        if edit_plan { motion_planning.edit_plan_open = true; }
+        else if edit_plan || motion_planning.edit_plan_window.open_in_next_frame {
+            motion_planning.edit_plan_window.open_in_next_frame = false;
+            if let Some(robot) = selected_entities.active_robot {
+                if let Ok(plan) = resources.plan_q.get(robot) {
+                    motion_planning.edit_plan_window.get_robot_data(
+                        robot,
+                        &plan.instructions
+                    );
+                    motion_planning.edit_plan_window.open = true;
+                }
+                else {
+                    return Err(Error::FailedOperation("Edit Plan failed: Selected robot doesn't have a Plan!".to_string()));
+                }
+            }
+            else {
+                return Err(Error::FailedOperation("Edit Plan failed: No robot selected!".to_string()));
+            }
+        }
+
+        EditPlanWindow::functionality(resources, events)?;
+        // TODO: InverseKinematicsWindow::functionality(resources, events)?;
+
         Ok(())
     }
 }
@@ -84,6 +108,7 @@ impl View for MotionPlanning {
 impl WindowUI for MotionPlanning {
     fn window_ui(&mut self, egui_ctx: &mut Context, ui_assets: &RobotLabUiAssets) {
         self.ik_window.window_ui(egui_ctx, ui_assets);
+        self.edit_plan_window.window_ui(egui_ctx, ui_assets);
     }
 }
 
@@ -91,4 +116,153 @@ impl WindowUI for MotionPlanning {
 pub struct UIElements {
     new_plan: Option<Id>,
     edit_plan: Option<Id>,
+}
+
+pub struct EditPlanWindow {
+    /// Whether the window is open
+    pub open: bool,
+    /// Used when this window needs to appear upon creating a new plan
+    open_in_next_frame: bool,
+    pub target_robot: Entity,
+    pub instructions: Vec<(usize, &'static str)>,
+
+    pub add_instruction_clicked: bool,
+    pub remove_instruction_clicked: bool,
+    pub cancel_clicked: bool,
+    pub save_order_clicked: bool,
+}
+
+impl EditPlanWindow {
+    pub fn get_robot_data(&mut self, target_robot: Entity, instructions: &Vec<Box<dyn Instruction>>) {
+        self.target_robot = target_robot;
+        self.instructions = instructions.iter()
+            .enumerate()
+            .map(|(i, v)| (i, (**v).instruction_name()))
+            .collect();
+    }
+}
+
+impl Default for EditPlanWindow {
+    fn default() -> Self {
+        Self {
+            open: default(),
+            open_in_next_frame: default(),
+            target_robot: Entity::PLACEHOLDER,
+            instructions: default(),
+            add_instruction_clicked: default(),
+            remove_instruction_clicked: default(),
+            cancel_clicked: default(),
+            save_order_clicked: default(),
+        }
+    }
+}
+
+impl View for EditPlanWindow {
+    fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+        let frame = Frame::default().inner_margin(4.0);
+        ui.label("Instructions");
+        ui.horizontal(|ui| {
+            self.add_instruction_clicked = ui.button("+").clicked();
+            self.remove_instruction_clicked = ui.button("-").clicked();
+        });
+
+        let mut from = None;
+        let mut to = None;
+        let (_, dropped_payload) = ui.dnd_drop_zone::<usize, ()>(frame, |ui| {
+            ui.vertical_centered(|ui| {
+                for (loc, instruction) in self.instructions.iter().map(|v| &v.1).enumerate() {
+                    let resp = ui.dnd_drag_source(
+                        Id::new(loc),
+                        loc,
+                        |ui| { let _ = ui.button(*instruction); },
+                    ).response;
+
+                    // Detect items held over this item in the instructions list
+                    if let (Some(pointer), Some(hovered_payload)) = (
+                        ui.input(|i| i.pointer.interact_pos()),
+                        resp.dnd_hover_payload::<usize>(),
+                    ) {
+                        let rect = resp.rect;
+
+                        // Draw the drop location preview
+                        let stroke = egui::Stroke::new(1.0, Color32::WHITE);
+                        let insert_row_idx = if *hovered_payload == loc {
+                            // Dragged onto this instruction
+                            ui.painter().hline(rect.x_range(), rect.center().y, stroke);
+                            loc
+                        } else if pointer.y < rect.center().y {
+                            // Above this instruction
+                            ui.painter().hline(rect.x_range(), rect.top(), stroke);
+                            loc
+                        } else {
+                            // Below this instruction
+                            ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
+                            loc + 1
+                        };
+
+                        // When the user drops an instruction onto the list
+                        if let Some(dragged_payload) = resp.dnd_release_payload() {
+                            // Set the from-to variables describing the change
+                            from = Some(dragged_payload);
+                            to = Some(insert_row_idx);
+                        }
+                    }
+                }
+            });
+        });
+
+        // If the user dropped an instruction onto the column,
+        // but not into any of the positions in the list
+        if let Some(dropped_payload) = dropped_payload {
+            // Move the dropped instruction to the bottom of the list
+            from = Some(dropped_payload);
+            to = Some(usize::MAX);
+        }
+
+        if let (Some(from), Some(mut to)) = (from, to) {
+            to -= (*from < to) as usize;
+            let item = self.instructions.remove(*from);
+
+            to = to.min(self.instructions.len());
+            self.instructions.insert(to, item);
+        }
+
+        ui.horizontal(|ui| {
+            self.cancel_clicked = ui.button("Cancel").clicked();
+            self.save_order_clicked = ui.button("Save Instruction Order").clicked();
+        });
+    }
+
+    fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
+        let window = &mut resources.motion_planning_tab.edit_plan_window;
+        if !window.open { return Ok(()); }
+
+        if window.cancel_clicked {
+            window.open = false;
+        }
+        else if window.save_order_clicked {
+            window.open = false;
+            events.plan_events.send(PlanEvent::ReorderInstructions {
+                robot_entity: window.target_robot,
+                instruction_order: window.instructions.iter()
+                    .map(|v| v.0)
+                    .collect()
+            });
+        }
+
+        Ok(())
+    }
+}
+
+impl WindowUI for EditPlanWindow {
+    fn window_ui(&mut self, egui_ctx: &mut Context, ui_assets: &RobotLabUiAssets) {
+        let mut open = self.open;
+        egui::Window::new("Edit Plan")
+            .open(&mut open)
+            .show(egui_ctx, |ui| {
+                self.ui(ui, ui_assets);
+            });
+        // Avoid borrow checker error
+        self.open = open;
+    }
 }

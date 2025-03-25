@@ -160,7 +160,6 @@ use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 pub(crate) use finish_ribbon_tab;
 use crate::error::ErrorEvent;
-use crate::motion_planning::CreatePlanEvent;
 use crate::ui::general::GeneralTab;
 
 pub fn ribbon_functionality(

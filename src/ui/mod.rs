@@ -35,7 +35,7 @@ use std::ops::DerefMut;
 use general::import::Import;
 use general::simulation::Simulation;
 use crate::general::{ImportEvent, SimulationEvent};
-use crate::motion_planning::CreatePlanEvent;
+use crate::motion_planning::{Plan, PlanEvent};
 use crate::ui::general::GeneralTab;
 use crate::ui::motion_planning::MotionPlanning;
 
@@ -98,9 +98,12 @@ impl Plugin for RobotLabUiPlugin {
 }
 
 #[derive(SystemParam)]
-pub struct UiResources<'w> {
+pub struct UiResources<'w, 's> {
     general_tab: GeneralTab<'w>,
     motion_planning_tab: NonSendMut<'w, MotionPlanning>,
+
+    // Robot resources
+    plan_q: Query<'w, 's, &'static Plan>,
 
     selected_entities: ResMut<'w, SelectedEntities>,
     scene_window_data: Res<'w, SceneWindowData>,
@@ -115,7 +118,7 @@ pub struct GizmosUiParameters<'w, 's> {
 
 #[derive(SystemParam)]
 pub struct UiEvents<'w> {
-    create_plan_event: EventWriter<'w, CreatePlanEvent>,
+    plan_events: EventWriter<'w, PlanEvent>,
     import_events: EventWriter<'w, ImportEvent>,
     simulation_events: EventWriter<'w, SimulationEvent>,
 }
