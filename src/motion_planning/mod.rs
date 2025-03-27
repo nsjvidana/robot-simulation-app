@@ -1,5 +1,4 @@
-mod sleep;
-mod wait;
+pub mod wait;
 
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -16,6 +15,9 @@ impl Plugin for MotionPlanningPlugin {
         app.add_event::<PlanEvent>();
 
         app.init_resource::<AllInstructions>();
+        app.world_mut().resource_mut::<AllInstructions>()
+            .instructions
+            .push(Box::new(wait::WaitInstruction::default()));
 
         app.add_systems(PostUpdate, init_plans);
     }
@@ -48,12 +50,16 @@ impl<T: Instruction + 'static> From<T> for InstructionObject {
 
 pub trait Instruction: Send + Sync + DynClone {
     fn execute(
-        &self,
+        &mut self,
         robot: &Robot,
         rapier_handles: &RapierRobotHandles,
         robot_entities: &RobotEntities,
         physics: PhysicsData,
     );
+
+    fn is_finished(&self) -> bool;
+
+    fn reset_finished_state(&mut self);
 
     fn instruction_name(&self) -> &'static str;
 }
