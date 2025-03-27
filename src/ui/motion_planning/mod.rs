@@ -6,7 +6,9 @@ use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResourc
 use bevy::prelude::{default, Entity, ResMut, Resource};
 use bevy_egui::egui;
 use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Rgba, Ui};
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use ik::InverseKinematicsWindow;
 use crate::motion_planning::PlanEvent::CreatePlanEvent;
 
@@ -87,7 +89,7 @@ impl View for MotionPlanning {
                 if let Ok(plan) = resources.plan_q.get(robot) {
                     motion_planning.edit_plan_window.get_robot_data(
                         robot,
-                        &plan.instructions
+                        plan.instructions.clone()
                     );
                     motion_planning.edit_plan_window.open = true;
                 }
@@ -126,7 +128,8 @@ pub struct EditPlanWindow {
     /// Used when this window needs to appear upon creating a new plan
     open_in_next_frame: bool,
     pub target_robot: Entity,
-    pub instructions: Vec<(usize, InstructionObject)>,
+    pub instructions: Arc<Mutex<Vec<InstructionObject>>>,
+    pub instruction_order: Vec<usize>,
     pub new_instruction_modal: NewInstructionModal,
 
     pub add_instruction_clicked: bool,
@@ -136,12 +139,13 @@ pub struct EditPlanWindow {
 }
 
 impl EditPlanWindow {
-    pub fn get_robot_data(&mut self, target_robot: Entity, instructions: &Vec<InstructionObject>) {
+    pub fn get_robot_data(&mut self, target_robot: Entity, instructions: Arc<Mutex<Vec<InstructionObject>>>) {
         self.target_robot = target_robot;
-        self.instructions = instructions
+        self.instructions = instructions.clone();
+        self.instruction_order = instructions.lock()
             .iter()
-            .cloned()
             .enumerate()
+            .map(|v| v.0)
             .collect();
     }
 }
@@ -153,6 +157,7 @@ impl Default for EditPlanWindow {
             open_in_next_frame: default(),
             target_robot: Entity::PLACEHOLDER,
             instructions: default(),
+            instruction_order: default(),
             new_instruction_modal: default(),
 
             add_instruction_clicked: default(),
@@ -171,14 +176,16 @@ impl View for EditPlanWindow {
             self.add_instruction_clicked = ui.button("+").clicked();
             self.remove_instruction_clicked = ui.button("-").clicked();
         });
+        
+        let mut instructions = self.instructions.lock();
 
         let mut from = None;
         let mut to = None;
         let (_, dropped_payload) = ui.dnd_drop_zone::<usize, ()>(frame, |ui| {
             ui.vertical_centered(|ui| {
-                for (loc, instruction) in self.instructions
+                for (loc, instruction) in instructions
                     .iter()
-                    .map(|v| v.1.lock().instruction_name())
+                    .map(|v| v.lock().instruction_name())
                     .enumerate()
                 {
                     let resp = ui.dnd_drag_source(
@@ -231,11 +238,13 @@ impl View for EditPlanWindow {
 
         if let (Some(from), Some(mut to)) = (from, to) {
             to -= (*from < to) as usize;
-            let item = self.instructions.remove(*from);
+            let item_order_pos = self.instruction_order.remove(*from);
 
-            to = to.min(self.instructions.len());
-            self.instructions.insert(to, item);
+            to = to.min(instructions.len());
+            self.instruction_order.insert(to, item_order_pos);
         }
+
+        std::mem::drop(instructions);
 
         self.new_instruction_modal.ui(ui, ui_assets);
 
@@ -256,7 +265,9 @@ impl View for EditPlanWindow {
             window.open = false;
             events.plan_events.send(PlanEvent::ReorderInstructions {
                 robot_entity: window.target_robot,
-                instruction_order: window.instructions.iter()
+                instruction_order: window.instructions.lock()
+                    .iter()
+                    .enumerate()
                     .map(|v| v.0)
                     .collect()
             });
@@ -266,7 +277,10 @@ impl View for EditPlanWindow {
             window.new_instruction_modal.open = true;
             window.new_instruction_modal.instruction_list.clear();
             window.new_instruction_modal.instruction_list
-                .append(&mut resources.instructions.clone());
+                .extend(resources.instructions.instructions
+                    .iter()
+                    .map(|v| dyn_clone::clone_box(&**v))
+                );
         }
 
         NewInstructionModal::functionality(resources, events)?;
@@ -291,13 +305,17 @@ impl WindowUI for EditPlanWindow {
 #[derive(Default)]
 pub struct NewInstructionModal {
     open: bool,
-    instruction_list: Vec<InstructionObject>,
-    clicked_instruction: Option<InstructionObject>,
+    instruction_list: Vec<Box<dyn Instruction>>,
+    clicked_instruction: Option<Box<dyn Instruction>>,
 }
 
 impl View for NewInstructionModal {
     fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+        // Reset clicked instruction
+        self.clicked_instruction = None;
+
         if !self.open { return; }
+
         egui::Modal::new(Id::new("New Instruction Modal")).show(ui.ctx(), |ui| {
             ui.set_min_width(250.);
 
@@ -308,10 +326,10 @@ impl View for NewInstructionModal {
                 .fill(Color32::DARK_GRAY)
                 .corner_radius(4.0)
                 .show(ui, |ui| {
-                    for instruction in self.instruction_list.iter() {
-                        let btn = ui.button(instruction.lock().instruction_name());
+                    for instruction in self.instruction_list.iter().cloned() {
+                        let btn = ui.button(instruction.instruction_name());
                         if btn.clicked() {
-                            self.clicked_instruction = Some(instruction.clone());
+                            self.clicked_instruction = Some(dyn_clone::clone_box(&*instruction));
                         }
                     }
                 });
@@ -329,15 +347,14 @@ impl View for NewInstructionModal {
             );
         });
     }
-    fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
+    fn functionality(resources: &mut UiResources, _events: &mut UiEvents) -> Result<()> {
         let window = &mut resources.motion_planning_tab.edit_plan_window;
-        let modal = &mut window.new_instruction_modal;
-        if let Some(instruction) = &modal.clicked_instruction {
-            events.plan_events.send(PlanEvent::AppendInstruction {
-                robot_entity: window.target_robot,
-                instruction: instruction.clone(),
-            });
-            modal.open = false;
+        if let Some(instruction) = &window.new_instruction_modal.clicked_instruction {
+            window.instructions.lock().push(
+                dyn_clone::clone(&*instruction).into()
+            );
+            window.get_robot_data(window.target_robot, window.instructions.clone());
+            window.new_instruction_modal.open = false;
         }
         Ok(())
     }

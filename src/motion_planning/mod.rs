@@ -17,7 +17,7 @@ impl Plugin for MotionPlanningPlugin {
         app.init_resource::<AllInstructions>();
         app.world_mut().resource_mut::<AllInstructions>()
             .instructions
-            .push(wait::WaitInstruction::default().into());
+            .push(Box::new(wait::WaitInstruction::default()));
 
         app.add_systems(PostUpdate, sync_plans);
     }
@@ -25,11 +25,11 @@ impl Plugin for MotionPlanningPlugin {
 
 #[derive(Resource, Default)]
 pub struct AllInstructions {
-    pub instructions: Vec<InstructionObject>,
+    pub instructions: Vec<Box<dyn Instruction>>,
 }
 
 impl Deref for AllInstructions {
-    type Target = Vec<InstructionObject>;
+    type Target = Vec<Box<dyn Instruction>>;
     fn deref(&self) -> &Self::Target {
         &self.instructions
     }
@@ -43,20 +43,32 @@ impl DerefMut for AllInstructions {
 
 #[derive(Component, Default)]
 pub struct Plan {
-    pub instructions: Vec<InstructionObject>,
+    pub instructions: Arc<Mutex<Vec<InstructionObject>>>,
+}
+
+impl Plan {
+    pub fn instructions(&self) -> MutexGuard<Vec<InstructionObject>> {
+        self.instructions.lock()
+    }
 }
 
 #[derive(Clone)]
-pub struct InstructionObject(pub Arc<Mutex<dyn Instruction>>);
+pub struct InstructionObject(pub Arc<Mutex<Box<dyn Instruction>>>);
 
 impl InstructionObject {
-    pub fn lock(&self) -> MutexGuard<'_, dyn Instruction> {
+    pub fn lock(&self) -> MutexGuard<'_, Box<dyn Instruction>> {
         self.0.lock()
     }
 }
 
 impl<T: Instruction + 'static> From<T> for InstructionObject {
     fn from(value: T) -> Self {
+        Self(Arc::new(Mutex::new(Box::new(value))))
+    }
+}
+
+impl From<Box<dyn Instruction + 'static>> for InstructionObject {
+    fn from(value: Box<dyn Instruction + 'static>) -> Self {
         Self(Arc::new(Mutex::new(value)))
     }
 }
@@ -77,6 +89,8 @@ pub trait Instruction: Send + Sync + DynClone {
     fn instruction_name(&self) -> &'static str;
 }
 
+dyn_clone::clone_trait_object!(Instruction);
+
 #[derive(Event)]
 pub enum PlanEvent {
     CreatePlanEvent {
@@ -87,10 +101,6 @@ pub enum PlanEvent {
         robot_entity: Entity,
         instruction_order: Vec<usize>
     },
-    AppendInstruction {
-        robot_entity: Entity,
-        instruction: InstructionObject,
-    }
 }
 
 pub fn sync_plans(
@@ -105,17 +115,12 @@ pub fn sync_plans(
                     .insert(plan);
             },
             PlanEvent::ReorderInstructions { robot_entity, instruction_order } => {
-                let instructions = &mut plans.get_mut(robot_entity).unwrap()
-                    .instructions;
+                let plan = plans.get_mut(robot_entity).unwrap();
+                let mut instructions = plan.instructions();
                 *instructions = instruction_order.into_iter()
                     .map(|v| instructions.remove(v))
                     .collect();
-            }
-            PlanEvent::AppendInstruction { robot_entity, instruction } => {
-                plans.get_mut(robot_entity).expect("Robot didn't have plan!")
-                    .instructions
-                    .push(instruction);
-            }
+            },
         }
     }
 }
