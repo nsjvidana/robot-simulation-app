@@ -19,7 +19,6 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use bevy::app::PostUpdate;
 use bevy::ecs::system::SystemParam;
-use bevy_egui::EguiSet;
 use parking_lot::Mutex;
 use crate::general::GeneralTabPlugin;
 use crate::motion_planning::MotionPlanningPlugin;
