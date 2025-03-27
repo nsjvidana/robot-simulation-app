@@ -1,9 +1,13 @@
+mod sleep;
+mod wait;
+
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use crate::prelude::*;
 use bevy::prelude::*;
 use dyn_clone::DynClone;
 use parking_lot::{Mutex, MutexGuard};
+use crate::PhysicsData;
 
 pub struct MotionPlanningPlugin;
 
@@ -48,6 +52,7 @@ pub trait Instruction: Send + Sync + DynClone {
         robot: &Robot,
         rapier_handles: &RapierRobotHandles,
         robot_entities: &RobotEntities,
+        physics: PhysicsData,
     );
 
     fn instruction_name(&self) -> &'static str;

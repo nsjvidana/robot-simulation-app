@@ -1,6 +1,6 @@
 use crate::error::ErrorEvent;
 use crate::prelude::*;
-use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Update, With};
+use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Time, Update, With};
 use bevy::{
     app::App,
     math::Vec3,
@@ -9,7 +9,7 @@ use bevy::{
 };
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode};
+use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode, WriteDefaultRapierContext};
 use bevy_rapier3d::{
     plugin::RapierPhysicsPlugin,
     prelude::{Collider, RigidBody},
@@ -18,6 +18,7 @@ use k::SerialChain;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use bevy::app::PostUpdate;
+use bevy::ecs::system::SystemParam;
 use bevy_egui::EguiSet;
 use parking_lot::Mutex;
 use crate::general::GeneralTabPlugin;
@@ -70,9 +71,10 @@ fn main() {
     app.run();
 }
 
-#[derive(Component)]
-pub struct TestComponent {
-    pub chain: SerialChain<Real>,
+#[derive(SystemParam)]
+pub struct PhysicsData<'w, 's> {
+    ctx: WriteDefaultRapierContext<'w, 's>,
+    time: Res<'w, Time>
 }
 
 pub fn update(mut robot_q: Query<&mut Transform, With<Robot>>, keys: Res<ButtonInput<KeyCode>>) {
