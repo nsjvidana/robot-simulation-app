@@ -17,7 +17,7 @@ impl Plugin for MotionPlanningPlugin {
         app.init_resource::<AllInstructions>();
         app.world_mut().resource_mut::<AllInstructions>()
             .instructions
-            .push(Box::new(wait::WaitInstruction::default()));
+            .push(wait::WaitInstruction::default().into());
 
         app.add_systems(PostUpdate, init_plans);
     }
@@ -25,7 +25,7 @@ impl Plugin for MotionPlanningPlugin {
 
 #[derive(Resource, Default)]
 pub struct AllInstructions {
-    instructions: Vec<Box<dyn Instruction>>,
+    instructions: Vec<InstructionObject>,
 }
 
 #[derive(Component, Default)]
@@ -94,7 +94,6 @@ pub fn init_plans(
                     .map(|v| instructions.remove(v))
                     .collect();
             }
-            _ => {}
         }
     }
 }
