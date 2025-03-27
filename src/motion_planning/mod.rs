@@ -19,7 +19,7 @@ impl Plugin for MotionPlanningPlugin {
             .instructions
             .push(wait::WaitInstruction::default().into());
 
-        app.add_systems(PostUpdate, init_plans);
+        app.add_systems(PostUpdate, sync_plans);
     }
 }
 
@@ -86,10 +86,14 @@ pub enum PlanEvent {
     ReorderInstructions {
         robot_entity: Entity,
         instruction_order: Vec<usize>
+    },
+    AppendInstruction {
+        robot_entity: Entity,
+        instruction: InstructionObject,
     }
 }
 
-pub fn init_plans(
+pub fn sync_plans(
     mut commands: Commands,
     mut plan_events: ResMut<Events<PlanEvent>>,
     mut plans: Query<&mut Plan>
@@ -106,6 +110,11 @@ pub fn init_plans(
                 *instructions = instruction_order.into_iter()
                     .map(|v| instructions.remove(v))
                     .collect();
+            }
+            PlanEvent::AppendInstruction { robot_entity, instruction } => {
+                plans.get_mut(robot_entity).expect("Robot didn't have plan!")
+                    .instructions
+                    .push(instruction);
             }
         }
     }

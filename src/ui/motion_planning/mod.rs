@@ -269,6 +269,8 @@ impl View for EditPlanWindow {
                 .append(&mut resources.instructions.clone());
         }
 
+        NewInstructionModal::functionality(resources, events)?;
+
         Ok(())
     }
 }
@@ -328,6 +330,15 @@ impl View for NewInstructionModal {
         });
     }
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
-        todo!()
+        let window = &mut resources.motion_planning_tab.edit_plan_window;
+        let modal = &mut window.new_instruction_modal;
+        if let Some(instruction) = &modal.clicked_instruction {
+            events.plan_events.send(PlanEvent::AppendInstruction {
+                robot_entity: window.target_robot,
+                instruction: instruction.clone(),
+            });
+            modal.open = false;
+        }
+        Ok(())
     }
 }
