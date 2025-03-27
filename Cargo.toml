@@ -28,7 +28,7 @@ anyhow = "1"
 opt-level = 2
 
 [patch.crates-io]
-assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "8487205" }
+assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "4710127" }
 
 #[profile.dev]
