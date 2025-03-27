@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use crate::prelude::*;
 use bevy::prelude::*;
+use dyn_clone::DynClone;
 use parking_lot::{Mutex, MutexGuard};
 
 pub struct MotionPlanningPlugin;
@@ -10,8 +11,15 @@ impl Plugin for MotionPlanningPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlanEvent>();
 
+        app.init_resource::<AllInstructions>();
+
         app.add_systems(PostUpdate, init_plans);
     }
+}
+
+#[derive(Resource, Default)]
+pub struct AllInstructions {
+    instructions: Vec<Box<dyn Instruction>>,
 }
 
 #[derive(Component, Default)]
@@ -34,7 +42,7 @@ impl<T: Instruction + 'static> From<T> for InstructionObject {
     }
 }
 
-pub trait Instruction: Send + Sync {
+pub trait Instruction: Send + Sync + DynClone {
     fn execute(
         &self,
         robot: &Robot,
