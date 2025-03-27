@@ -35,7 +35,7 @@ use std::ops::DerefMut;
 use general::import::Import;
 use general::simulation::Simulation;
 use crate::general::{ImportEvent, SimulationEvent};
-use crate::motion_planning::{Plan, PlanEvent};
+use crate::motion_planning::{AllInstructions, Plan, PlanEvent};
 use crate::ui::general::GeneralTab;
 use crate::ui::motion_planning::MotionPlanning;
 
@@ -55,11 +55,11 @@ impl RobotLabUiPlugin {
 
 impl Plugin for RobotLabUiPlugin {
     fn build(&self, app: &mut App) {
-        // Ensure that the plugins this plugin depends on are added to the app.
-        if app.get_added_plugins::<EguiPlugin>().is_empty() {
+        // Ensure that plugins this plugin depends on are already added
+        if !app.is_plugin_added::<EguiPlugin>() {
             app.add_plugins(EguiPlugin);
         }
-        if app.get_added_plugins::<GizmoPlugin>().is_empty() {
+        if !app.is_plugin_added::<GizmoPlugin>() {
             app.add_plugins(GizmoPlugin);
         }
 
@@ -104,6 +104,8 @@ pub struct UiResources<'w, 's> {
 
     // Robot resources
     plan_q: Query<'w, 's, &'static Plan>,
+
+    instructions: Res<'w, AllInstructions>,
 
     selected_entities: ResMut<'w, SelectedEntities>,
     scene_window_data: Res<'w, SceneWindowData>,

@@ -25,7 +25,20 @@ impl Plugin for MotionPlanningPlugin {
 
 #[derive(Resource, Default)]
 pub struct AllInstructions {
-    instructions: Vec<InstructionObject>,
+    pub instructions: Vec<InstructionObject>,
+}
+
+impl Deref for AllInstructions {
+    type Target = Vec<InstructionObject>;
+    fn deref(&self) -> &Self::Target {
+        &self.instructions
+    }
+}
+
+impl DerefMut for AllInstructions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.instructions
+    }
 }
 
 #[derive(Component, Default)]

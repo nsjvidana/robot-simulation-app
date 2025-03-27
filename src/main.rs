@@ -19,6 +19,8 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use bevy::app::PostUpdate;
 use bevy::ecs::system::SystemParam;
+use bevy::gizmos::GizmoPlugin;
+use bevy_egui::EguiPlugin;
 use parking_lot::Mutex;
 use crate::general::GeneralTabPlugin;
 use crate::motion_planning::MotionPlanningPlugin;
@@ -44,18 +46,20 @@ fn main() {
 
     app.add_event::<ErrorEvent>();
 
+
+    app.add_plugins(DefaultPlugins);
     app.add_plugins((
-        DefaultPlugins,
-        RapierPhysicsPlugin::<()>::default().in_schedule(FixedUpdate),
-        RapierDebugRenderPlugin::default(),
-        // SalvaPhysicsPlugin::new(),
-        WorldInspectorPlugin::default(),
-        // EguiPlugin,
         GeneralTabPlugin::new(FixedUpdate),
         MotionPlanningPlugin,
         RobotLabUiPlugin::new(Update),
         RobotPlugin,
         NoCameraPlayerPlugin,
+    ));
+    app.add_plugins((
+        RapierPhysicsPlugin::<()>::default().in_schedule(FixedUpdate),
+        RapierDebugRenderPlugin::default(),
+        // SalvaPhysicsPlugin::new(),
+        WorldInspectorPlugin::default(),
     ));
 
     app.add_systems(Startup, startup);

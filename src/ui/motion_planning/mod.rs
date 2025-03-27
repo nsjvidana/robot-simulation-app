@@ -5,9 +5,10 @@ use crate::prelude::*;
 use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
 use bevy::prelude::{default, Entity, ResMut, Resource};
 use bevy_egui::egui;
-use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Ui};
+use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Rgba, Ui};
 use std::ops::DerefMut;
 use ik::InverseKinematicsWindow;
+use crate::motion_planning::PlanEvent::CreatePlanEvent;
 
 #[derive(Default)]
 pub struct MotionPlanning {
@@ -126,6 +127,7 @@ pub struct EditPlanWindow {
     open_in_next_frame: bool,
     pub target_robot: Entity,
     pub instructions: Vec<(usize, InstructionObject)>,
+    pub new_instruction_modal: NewInstructionModal,
 
     pub add_instruction_clicked: bool,
     pub remove_instruction_clicked: bool,
@@ -151,6 +153,8 @@ impl Default for EditPlanWindow {
             open_in_next_frame: default(),
             target_robot: Entity::PLACEHOLDER,
             instructions: default(),
+            new_instruction_modal: default(),
+
             add_instruction_clicked: default(),
             remove_instruction_clicked: default(),
             cancel_clicked: default(),
@@ -160,7 +164,7 @@ impl Default for EditPlanWindow {
 }
 
 impl View for EditPlanWindow {
-    fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+    fn ui(&mut self, ui: &mut Ui, ui_assets: &RobotLabUiAssets) {
         let frame = Frame::default().inner_margin(4.0);
         ui.label("Instructions");
         ui.horizontal(|ui| {
@@ -233,6 +237,8 @@ impl View for EditPlanWindow {
             self.instructions.insert(to, item);
         }
 
+        self.new_instruction_modal.ui(ui, ui_assets);
+
         ui.horizontal(|ui| {
             self.cancel_clicked = ui.button("Cancel").clicked();
             self.save_order_clicked = ui.button("Save Instruction Order").clicked();
@@ -256,6 +262,13 @@ impl View for EditPlanWindow {
             });
         }
 
+        if window.add_instruction_clicked {
+            window.new_instruction_modal.open = true;
+            window.new_instruction_modal.instruction_list.clear();
+            window.new_instruction_modal.instruction_list
+                .append(&mut resources.instructions.clone());
+        }
+
         Ok(())
     }
 }
@@ -270,5 +283,51 @@ impl WindowUI for EditPlanWindow {
             });
         // Avoid borrow checker error
         self.open = open;
+    }
+}
+
+#[derive(Default)]
+pub struct NewInstructionModal {
+    open: bool,
+    instruction_list: Vec<InstructionObject>,
+    clicked_instruction: Option<InstructionObject>,
+}
+
+impl View for NewInstructionModal {
+    fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+        if !self.open { return; }
+        egui::Modal::new(Id::new("New Instruction Modal")).show(ui.ctx(), |ui| {
+            ui.set_min_width(250.);
+
+            ui.heading("Create New Instruction");
+
+            ui.label("Instructions:");
+            Frame::default().inner_margin(4.0)
+                .fill(Color32::DARK_GRAY)
+                .corner_radius(4.0)
+                .show(ui, |ui| {
+                    for instruction in self.instruction_list.iter() {
+                        let btn = ui.button(instruction.lock().instruction_name());
+                        if btn.clicked() {
+                            self.clicked_instruction = Some(instruction.clone());
+                        }
+                    }
+                });
+
+            ui.separator();
+
+            egui::Sides::new().show(
+                ui,
+                |_| {},
+                |ui| {
+                    if ui.button("Create").clicked() {
+                        self.open = false;
+                    }
+                }
+            );
+        });
+    }
+    fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
+        todo!()
     }
 }
