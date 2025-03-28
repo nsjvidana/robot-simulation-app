@@ -128,7 +128,8 @@ pub struct EditPlanWindow {
     /// Used when this window needs to appear upon creating a new plan
     open_in_next_frame: bool,
     pub target_robot: Entity,
-    pub instructions: Arc<Mutex<Vec<InstructionObject>>>,
+    instructions: Arc<Mutex<Vec<InstructionObject>>>,
+    pub display_instructions: Vec<InstructionObject>,
     pub instruction_order: Vec<usize>,
     pub new_instruction_modal: NewInstructionModal,
 
@@ -140,9 +141,11 @@ pub struct EditPlanWindow {
 
 impl EditPlanWindow {
     pub fn get_robot_data(&mut self, target_robot: Entity, instructions: Arc<Mutex<Vec<InstructionObject>>>) {
+        let instructions_guard = instructions.lock();
         self.target_robot = target_robot;
         self.instructions = instructions.clone();
-        self.instruction_order = instructions.lock()
+        self.display_instructions = instructions_guard.clone();
+        self.instruction_order = instructions_guard
             .iter()
             .enumerate()
             .map(|v| v.0)
@@ -157,6 +160,7 @@ impl Default for EditPlanWindow {
             open_in_next_frame: default(),
             target_robot: Entity::PLACEHOLDER,
             instructions: default(),
+            display_instructions: default(),
             instruction_order: default(),
             new_instruction_modal: default(),
 
@@ -177,7 +181,7 @@ impl View for EditPlanWindow {
             self.remove_instruction_clicked = ui.button("-").clicked();
         });
         
-        let mut instructions = self.instructions.lock();
+        let instructions = &mut self.display_instructions;
 
         let mut from = None;
         let mut to = None;
@@ -238,13 +242,11 @@ impl View for EditPlanWindow {
 
         if let (Some(from), Some(mut to)) = (from, to) {
             to -= (*from < to) as usize;
-            let item_order_pos = self.instruction_order.remove(*from);
+            let item_order_pos = instructions.remove(*from);
 
             to = to.min(instructions.len());
-            self.instruction_order.insert(to, item_order_pos);
+            instructions.insert(to, item_order_pos);
         }
-
-        std::mem::drop(instructions);
 
         self.new_instruction_modal.ui(ui, ui_assets);
 
@@ -263,14 +265,17 @@ impl View for EditPlanWindow {
         }
         else if window.save_order_clicked {
             window.open = false;
-            events.plan_events.send(PlanEvent::ReorderInstructions {
-                robot_entity: window.target_robot,
-                instruction_order: window.instructions.lock()
-                    .iter()
-                    .enumerate()
-                    .map(|v| v.0)
-                    .collect()
-            });
+            let mut instructions_list = window.instructions.lock();
+            instructions_list.clear();
+            instructions_list.append(&mut window.display_instructions.clone());
+            // events.plan_events.send(PlanEvent::ReorderInstructions {
+            //     robot_entity: window.target_robot,
+            //     instruction_order: window.display_instructions
+            //         .iter()
+            //         .enumerate()
+            //         .map(|v| v.0)
+            //         .collect()
+            // });
         }
 
         if window.add_instruction_clicked {
@@ -350,10 +355,9 @@ impl View for NewInstructionModal {
     fn functionality(resources: &mut UiResources, _events: &mut UiEvents) -> Result<()> {
         let window = &mut resources.motion_planning_tab.edit_plan_window;
         if let Some(instruction) = &window.new_instruction_modal.clicked_instruction {
-            window.instructions.lock().push(
+            window.display_instructions.push(
                 dyn_clone::clone(&*instruction).into()
             );
-            window.get_robot_data(window.target_robot, window.instructions.clone());
             window.new_instruction_modal.open = false;
         }
         Ok(())
