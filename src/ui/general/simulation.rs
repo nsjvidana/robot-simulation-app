@@ -16,6 +16,8 @@ pub struct Simulation {
     pub play_toggle_clicked: bool,
     pub step_clicked: bool,
     pub reset_clicked: bool,
+
+    disable_physics_next_frame: bool,
 }
 
 impl Default for Simulation {
@@ -28,6 +30,7 @@ impl Default for Simulation {
             play_toggle_clicked: default(),
             step_clicked: default(),
             reset_clicked: default(),
+            disable_physics_next_frame: default(),
         }
     }
 }
@@ -56,35 +59,43 @@ impl View for Simulation {
         let physics_sim = resources.general_tab.simulation.deref_mut();
         let events = &mut events.simulation_events;
 
+        let mut is_stepping_sim = false;
+        let prev_physics_active = physics_sim.physics_active;
         if physics_sim.play_toggle_clicked {
-            physics_sim.physics_active = !physics_sim.physics_active
+            physics_sim.physics_active = !physics_sim.physics_active;
         }
-        physics_sim.step_sim = physics_sim.step_clicked;
-        if physics_sim.reset_clicked {
-            physics_sim.reset_simulation();
-            events.send(SimulationEvent::SimulationAction(SimulationAction::Load));
-        } else if physics_sim.physics_active || physics_sim.step_sim {
+        else if physics_sim.step_clicked {
+            if physics_sim.physics_active {
+                physics_sim.physics_active = false;
+            }
+            else {
+                is_stepping_sim = true;
+            }
+        }
+        else if physics_sim.reset_clicked {
+            physics_sim.physics_active = true;
+        }
+
+        // Handling events
+        if prev_physics_active != physics_sim.physics_active {
+            if physics_sim.physics_active {
+                // If exiting resetted state, save a physics snapshot
+                if physics_sim.sim_resetted {
+                    events.send(SimulationEvent::SimulationAction(SimulationAction::Save));
+                }
+                physics_sim.sim_resetted = false;
+                events.send(SimulationEvent::PhysicsActive(true));
+            }
+            else {
+                events.send(SimulationEvent::PhysicsActive(false));
+            }
+        }
+        if is_stepping_sim {
             if physics_sim.sim_resetted {
                 events.send(SimulationEvent::SimulationAction(SimulationAction::Save));
             }
             physics_sim.sim_resetted = false;
-        }
-
-        if physics_sim.physics_active {
-            // Pressing "Step" when the sim is already running pauses the simulation
-            if physics_sim.step_sim {
-                physics_sim.physics_active = false;
-                events.send(SimulationEvent::PhysicsActive(false));
-            } else {
-                events.send(SimulationEvent::PhysicsActive(true));
-            } // If step not pressed, let the sim play.
-        } else {
-            // If the sim is paused, only run it for one frame when the "Step" button is pressed.
-            if physics_sim.step_sim {
-                events.send(SimulationEvent::PhysicsActive(true));
-            } else {
-                events.send(SimulationEvent::PhysicsActive(false));
-            }
+            events.send(SimulationEvent::StepOnce);
         }
 
         Ok(())

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bevy::app::App;
 use bevy::core::Name;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
-use bevy::prelude::{Commands, Entity, Event, EventWriter, Events, FixedUpdate, IntoSystemConfigs, Plugin, PostUpdate, Query, ResMut, Resource, With};
+use bevy::prelude::{Commands, Entity, Event, EventWriter, Events, FixedUpdate, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
 use bevy_rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::error::{Error, ErrorEvent};
@@ -65,6 +65,7 @@ pub enum SimulationEvent {
     SimulationAction(SimulationAction),
     // Change whether physics is active or not
     PhysicsActive(bool),
+    StepOnce
 }
 
 pub enum SimulationAction {
@@ -108,7 +109,14 @@ pub fn import_robots(
     }
 }
 
+#[derive(Default)]
+struct HandleEventsState {
+    is_stepping_sim: bool,
+    stepped_sim: bool,
+}
+
 pub fn handle_simulation_events(
+    mut state: Local<HandleEventsState>,
     mut commands: Commands,
     mut events: ResMut<Events<SimulationEvent>>,
     mut snapshot: ResMut<SimulationSnapshot>,
@@ -146,6 +154,22 @@ pub fn handle_simulation_events(
             SimulationEvent::PhysicsActive(physics_active) => {
                 rapier_config.physics_pipeline_active = physics_active;
             },
+            SimulationEvent::StepOnce => {
+                state.is_stepping_sim = true;
+                state.stepped_sim = false;
+            },
+        }
+    }
+
+    if state.is_stepping_sim {
+        if state.stepped_sim {
+            rapier_config.physics_pipeline_active = false;
+            state.is_stepping_sim = false;
+            state.stepped_sim = false;
+        }
+        else {
+            rapier_config.physics_pipeline_active = true;
+            state.stepped_sim = true;
         }
     }
 }
