@@ -140,7 +140,8 @@ impl View for ImportWindow {
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
         let window = &mut resources.general_tab.import.window;
         if !window.import_clicked { return Ok(()); }
-        window.import_clicked = false; // Refresh button state for next frame
+        // Close window upon clicking "Import URDF"
+        window.is_open = false;
 
         let file_path = PathBuf::from(&window.import_file_path);
         let mesh_dir = PathBuf::from(&window.mesh_dir);
