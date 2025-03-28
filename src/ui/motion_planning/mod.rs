@@ -136,7 +136,7 @@ pub struct EditPlanWindow {
     pub add_instruction_clicked: bool,
     pub remove_instruction_clicked: bool,
     pub cancel_clicked: bool,
-    pub save_order_clicked: bool,
+    pub save_clicked: bool,
 }
 
 impl EditPlanWindow {
@@ -167,7 +167,7 @@ impl Default for EditPlanWindow {
             add_instruction_clicked: default(),
             remove_instruction_clicked: default(),
             cancel_clicked: default(),
-            save_order_clicked: default(),
+            save_clicked: default(),
         }
     }
 }
@@ -252,7 +252,7 @@ impl View for EditPlanWindow {
 
         ui.horizontal(|ui| {
             self.cancel_clicked = ui.button("Cancel").clicked();
-            self.save_order_clicked = ui.button("Save Instruction Order").clicked();
+            self.save_clicked = ui.button("Save").clicked();
         });
     }
 
@@ -263,7 +263,7 @@ impl View for EditPlanWindow {
         if window.cancel_clicked {
             window.open = false;
         }
-        else if window.save_order_clicked {
+        else if window.save_clicked {
             window.open = false;
             let mut instructions_list = window.instructions.lock();
             instructions_list.clear();
