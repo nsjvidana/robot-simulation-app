@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bevy::app::App;
 use bevy::core::Name;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
-use bevy::prelude::{Commands, Entity, Event, EventWriter, Events, FixedUpdate, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
+use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
 use bevy_rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::error::{Error, ErrorEvent};
@@ -118,7 +118,7 @@ struct HandleEventsState {
 pub fn handle_simulation_events(
     mut state: Local<HandleEventsState>,
     mut commands: Commands,
-    mut events: ResMut<Events<SimulationEvent>>,
+    mut events: EventReader<SimulationEvent>,
     mut snapshot: ResMut<SimulationSnapshot>,
     mut rapier_config_q: Query<
         (&mut RapierConfiguration, &mut RapierContext),
@@ -127,7 +127,7 @@ pub fn handle_simulation_events(
     mut robot_set: ResMut<RobotSet>,
 ) {
     let (mut rapier_config, mut rapier_context) = rapier_config_q.single_mut();
-    for event in events.drain() {
+    for event in events.read() {
         match event {
             SimulationEvent::SimulationAction(action) => {
                 match action {
@@ -152,7 +152,7 @@ pub fn handle_simulation_events(
                 }
             },
             SimulationEvent::PhysicsActive(physics_active) => {
-                rapier_config.physics_pipeline_active = physics_active;
+                rapier_config.physics_pipeline_active = *physics_active;
             },
             SimulationEvent::StepOnce => {
                 state.is_stepping_sim = true;

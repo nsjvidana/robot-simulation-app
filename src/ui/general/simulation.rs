@@ -16,8 +16,6 @@ pub struct Simulation {
     pub play_toggle_clicked: bool,
     pub step_clicked: bool,
     pub reset_clicked: bool,
-
-    disable_physics_next_frame: bool,
 }
 
 impl Default for Simulation {
@@ -30,7 +28,6 @@ impl Default for Simulation {
             play_toggle_clicked: default(),
             step_clicked: default(),
             reset_clicked: default(),
-            disable_physics_next_frame: default(),
         }
     }
 }
