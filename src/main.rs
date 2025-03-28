@@ -50,7 +50,7 @@ fn main() {
     app.add_plugins(DefaultPlugins);
     app.add_plugins((
         GeneralTabPlugin::new(FixedUpdate),
-        MotionPlanningPlugin,
+        MotionPlanningPlugin::new(FixedUpdate),
         RobotLabUiPlugin::new(Update),
         RobotPlugin,
         NoCameraPlayerPlugin,

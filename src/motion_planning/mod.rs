@@ -2,13 +2,25 @@ pub mod wait;
 
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::PhysicsSet;
 use dyn_clone::DynClone;
 use parking_lot::{Mutex, MutexGuard};
+use crate::general::SimulationEvent;
 use crate::PhysicsData;
+use crate::ui::general::simulation::Simulation;
 
-pub struct MotionPlanningPlugin;
+pub struct MotionPlanningPlugin {
+    physics_schedule: InternedScheduleLabel,
+}
+
+impl MotionPlanningPlugin {
+    pub fn new(physics_schedule: impl ScheduleLabel) -> Self {
+        Self { physics_schedule: physics_schedule.intern() }
+    }
+}
 
 impl Plugin for MotionPlanningPlugin {
     fn build(&self, app: &mut App) {
@@ -19,7 +31,24 @@ impl Plugin for MotionPlanningPlugin {
             .instructions
             .push(Box::new(wait::WaitInstruction::default()));
 
-        app.add_systems(PostUpdate, sync_plans);
+        app.add_systems(
+            PostUpdate,
+            sync_plans
+        );
+
+        app.add_systems(
+            self.physics_schedule,
+            run_plans
+                .before(PhysicsSet::SyncBackend)
+        );
+    }
+}
+
+impl Default for MotionPlanningPlugin {
+    fn default() -> Self {
+        Self {
+            physics_schedule: FixedUpdate.intern()
+        }
     }
 }
 
@@ -79,7 +108,7 @@ pub trait Instruction: Send + Sync + DynClone {
         robot: &Robot,
         rapier_handles: &RapierRobotHandles,
         robot_entities: &RobotEntities,
-        physics: PhysicsData,
+        physics: &PhysicsData,
     );
 
     fn is_finished(&self) -> bool;
@@ -121,6 +150,50 @@ pub fn sync_plans(
                     .map(|v| instructions.remove(v))
                     .collect();
             },
+        }
+    }
+}
+
+#[derive(Default)]
+struct RunPlansState {
+    physics_active: bool
+}
+
+pub fn run_plans(
+    mut state: Local<RunPlansState>,
+    mut simulation_events: EventReader<SimulationEvent>,
+    physics: PhysicsData,
+    robots: Query<(&Plan, &Robot, &RobotHandle, &RapierRobotHandles)>,
+    robot_set: Res<RobotSet>,
+) {
+    for event in simulation_events.read() {
+        if let SimulationEvent::PhysicsActive(active) = event {
+            state.physics_active = *active;
+            // Reset instruction states if the sim was disabled.
+            if !active {
+                println!("sim was disabled");
+            }
+        }
+    }
+    if !state.physics_active {
+        return;
+    }
+
+    for (plan, robot, robot_handle, rapier_handles) in robots.iter() {
+        let mut instructions = plan.instructions.lock();
+        for mut instruction in instructions
+            .iter()
+            .map(|v| v.0.lock())
+        {
+            //TODO: add support for a loop instruction (maybe pass instruction list into instruction?)
+            if instruction.is_finished() { continue; }
+            instruction.execute(
+                robot,
+                rapier_handles,
+                &robot_set.robots.get(robot_handle.0).unwrap().entities,
+                &physics
+            );
+            if !instruction.is_finished() { break; }
         }
     }
 }

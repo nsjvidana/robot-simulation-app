@@ -11,7 +11,7 @@ pub struct WaitInstruction {
 }
 
 impl Instruction for WaitInstruction {
-    fn execute(&mut self, robot: &Robot, rapier_handles: &RapierRobotHandles, robot_entities: &RobotEntities, physics: PhysicsData) {
+    fn execute(&mut self, _robot: &Robot, _rapier_handles: &RapierRobotHandles, _robot_entities: &RobotEntities, physics: &PhysicsData) {
         self.time_waited += physics.time.delta();
         if self.time_waited >= self.delay {
             self.finished = true;
@@ -24,6 +24,7 @@ impl Instruction for WaitInstruction {
 
     fn reset_finished_state(&mut self) {
         self.finished = false;
+        self.time_waited = Duration::from_secs(0);
     }
 
     fn instruction_name(&self) -> &'static str {
