@@ -26,14 +26,16 @@ impl Plugin for MotionPlanningPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlanEvent>();
 
-        app.init_resource::<AllInstructions>();
+        app.init_resource::<AllInstructions>()
+            .init_resource::<RunPlansState>();
         app.world_mut().resource_mut::<AllInstructions>()
             .instructions
             .push(Box::new(wait::WaitInstruction::default()));
 
         app.add_systems(
             PostUpdate,
-            sync_plans
+            (sync_plans, plan_execution_prep)
+                .chain()
         );
 
         app.add_systems(
@@ -154,27 +156,38 @@ pub fn sync_plans(
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct RunPlansState {
     physics_active: bool
 }
 
-pub fn run_plans(
-    mut state: Local<RunPlansState>,
+pub fn plan_execution_prep(
+    mut state: ResMut<RunPlansState>,
+    robots: Query<(&Plan, &Robot, &RobotHandle, &RapierRobotHandles)>,
     mut simulation_events: EventReader<SimulationEvent>,
+) {
+    // TODO: add support for stepping physics
+    for event in simulation_events.read() {
+        if let SimulationEvent::PhysicsActive(active) = event {
+            state.physics_active = *active;
+            if !active {
+                // Reset all robot plans when physics gets disabled.
+                for (plan, ..) in robots.iter() {
+                    for instruction in plan.instructions.lock().iter() {
+                        instruction.lock().reset_finished_state();
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn run_plans(
+    mut state: ResMut<RunPlansState>,
     physics: PhysicsData,
     robots: Query<(&Plan, &Robot, &RobotHandle, &RapierRobotHandles)>,
     robot_set: Res<RobotSet>,
 ) {
-    for event in simulation_events.read() {
-        if let SimulationEvent::PhysicsActive(active) = event {
-            state.physics_active = *active;
-            // Reset instruction states if the sim was disabled.
-            if !active {
-                println!("sim was disabled");
-            }
-        }
-    }
     if !state.physics_active {
         return;
     }

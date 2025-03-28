@@ -9,7 +9,7 @@ use bevy::{
 };
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier3d::prelude::{RapierDebugRenderPlugin, TimestepMode, WriteDefaultRapierContext};
+use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteDefaultRapierContext};
 use bevy_rapier3d::{
     plugin::RapierPhysicsPlugin,
     prelude::{Collider, RigidBody},
@@ -77,6 +77,7 @@ fn main() {
 #[derive(SystemParam)]
 pub struct PhysicsData<'w, 's> {
     ctx: WriteDefaultRapierContext<'w, 's>,
+    ctx_config: Query<'w, 's, &'static mut RapierConfiguration, With<DefaultRapierContext>>,
     time: Res<'w, Time>
 }
 
