@@ -70,7 +70,10 @@ impl View for Simulation {
             }
         }
         else if physics_sim.reset_clicked {
-            physics_sim.physics_active = true;
+            if !physics_sim.sim_resetted {
+                events.send(SimulationEvent::SimulationAction(SimulationAction::Load));
+            }
+            physics_sim.reset_simulation();
         }
 
         // Handling events
