@@ -24,9 +24,10 @@ impl GeneralTabPlugin {
 
 impl Plugin for GeneralTabPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<ImportEvent>()
-            .add_event::<SimulationEvent>();
+        app.add_event::<ImportEvent>();
+        app.init_resource::<Events<SimulationEvent>>();
+
+        app.world_mut().send_event(SimulationEvent::PhysicsActive(false));
 
         app.init_resource::<SimulationSnapshot>();
 
@@ -65,7 +66,7 @@ pub enum SimulationEvent {
     SimulationAction(SimulationAction),
     // Change whether physics is active or not
     PhysicsActive(bool),
-    StepOnce
+    StepOnce,
 }
 
 pub enum SimulationAction {
@@ -118,7 +119,7 @@ struct HandleEventsState {
 pub fn handle_simulation_events(
     mut state: Local<HandleEventsState>,
     mut commands: Commands,
-    mut events: EventReader<SimulationEvent>,
+    mut events: ResMut<Events<SimulationEvent>>,
     mut snapshot: ResMut<SimulationSnapshot>,
     mut rapier_config_q: Query<
         (&mut RapierConfiguration, &mut RapierContext),
@@ -127,7 +128,7 @@ pub fn handle_simulation_events(
     mut robot_set: ResMut<RobotSet>,
 ) {
     let (mut rapier_config, mut rapier_context) = rapier_config_q.single_mut();
-    for event in events.read() {
+    for event in events.update_drain() {
         match event {
             SimulationEvent::SimulationAction(action) => {
                 match action {
@@ -152,7 +153,7 @@ pub fn handle_simulation_events(
                 }
             },
             SimulationEvent::PhysicsActive(physics_active) => {
-                rapier_config.physics_pipeline_active = *physics_active;
+                rapier_config.physics_pipeline_active = physics_active;
             },
             SimulationEvent::StepOnce => {
                 state.is_stepping_sim = true;

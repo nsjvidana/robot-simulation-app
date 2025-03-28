@@ -59,7 +59,7 @@ fn main() {
         RapierPhysicsPlugin::<()>::default().in_schedule(FixedUpdate),
         RapierDebugRenderPlugin::default(),
         // SalvaPhysicsPlugin::new(),
-        WorldInspectorPlugin::default(),
+        // WorldInspectorPlugin::default(),
     ));
 
     app.add_systems(Startup, startup);
