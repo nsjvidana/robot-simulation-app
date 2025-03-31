@@ -22,12 +22,6 @@ thiserror = "1"
 parking_lot = "0.12.3"
 dyn-clone = "1.0.19"
 
-[profile.dev.package."*"]
-opt-level = 2
-
 [patch.crates-io]
 assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "4710127" }
-
-#[profile.dev]
-#opt-level = 1
