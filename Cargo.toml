@@ -25,3 +25,11 @@ dyn-clone = "1.0.19"
 [patch.crates-io]
 assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "4710127" }
+
+[profile.dev.package."rapier3d"]
+opt-level = 3
+[profile.dev.package."bevy_rapier3d"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
