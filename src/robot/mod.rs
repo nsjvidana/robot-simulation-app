@@ -1,4 +1,4 @@
-use crate::prelude::urdf_rs_robot_to_xurdf;
+use crate::convert::urdf_rs_robot_to_xurdf;
 use bevy::app::App;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use bevy_rapier3d::prelude::systems::*;
+use crate::error::error_handling_system;
 use crate::math::Real;
 
 pub mod systems;
@@ -23,10 +24,9 @@ impl Plugin for RobotPlugin {
             (
                 systems::sync_robot_changes.before(PhysicsSet::SyncBackend),
                 systems::init_robots
+                    .pipe(error_handling_system)
                     .in_set(PhysicsSet::SyncBackend)
-                    .after(init_rigid_bodies)
-                    .after(init_colliders)
-                    .after(init_joints),
+                    .after(apply_initial_rigid_body_impulses),
             ),
         );
     }
@@ -82,10 +82,10 @@ impl Robot {
 }
 
 #[derive(Component)]
-pub struct RapierRobotHandles(pub(crate) UrdfRobotHandles<Option<Index>>);
+pub struct RapierRobotHandles(pub(crate) UrdfRobotHandles<Index>);
 
 impl Deref for RapierRobotHandles {
-    type Target = UrdfRobotHandles<Option<Index>>;
+    type Target = UrdfRobotHandles<Index>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -97,6 +97,7 @@ impl DerefMut for RapierRobotHandles {
     }
 }
 
+#[derive(Clone)]
 pub enum RobotJointType {
     ImpulseJoints,
     MultibodyJoints(UrdfMultibodyOptions),

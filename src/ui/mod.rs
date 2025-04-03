@@ -23,7 +23,7 @@ use bevy_rapier3d::plugin::TimestepMode;
 use bevy_rapier3d::prelude::{
     DefaultRapierContext, ImpulseJoint, MultibodyJoint, PhysicsSet, QueryFilter,
     RapierConfiguration, RapierContext, RapierImpulseJointHandle, RapierMultibodyJointHandle,
-    RayIntersection, ReadDefaultRapierContext,
+    RayIntersection, ReadRapierContext,
 };
 use bevy_rapier3d::rapier::crossbeam::channel::internal::select;
 use bevy_rapier3d::rapier::prelude::{Cuboid, Ray};
@@ -280,7 +280,7 @@ pub fn update_scene_window_data(
 pub fn update_hovered_entities(
     mut egui_ctxs: EguiContexts,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
-    rapier_context: ReadDefaultRapierContext,
+    rapier_context: ReadRapierContext,
     mut selected_entities: ResMut<SelectedEntities>,
     scene_window_data: Res<SceneWindowData>,
 ) {
@@ -295,7 +295,7 @@ pub fn update_hovered_entities(
     let ray = scene_window_data.viewport_to_world_ray.unwrap();
     // Get hovered entities
     let mut intersections = vec![];
-    get_intersections(&mut intersections, &rapier_context, &ray);
+    get_intersections(&mut intersections, &rapier_context.single(), &ray);
     let mut ents = intersections.iter().map(|v| v.0).collect();
     selected_entities.hovered_entities.append(&mut ents);
 

@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use bevy::app::App;
 use bevy::core::Name;
@@ -7,7 +7,7 @@ use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, F
 use bevy_rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::error::{Error, ErrorEvent};
-use crate::prelude::{Robot, RobotSet};
+use crate::prelude::{RapierContextTuple, Robot, RobotSet};
 use crate::ui::general::import::ImportJointType;
 
 pub struct GeneralTabPlugin {
@@ -121,21 +121,29 @@ pub fn handle_simulation_events(
     mut commands: Commands,
     mut events: ResMut<Events<SimulationEvent>>,
     mut snapshot: ResMut<SimulationSnapshot>,
-    mut rapier_config_q: Query<
-        (&mut RapierConfiguration, &mut RapierContext),
-        With<DefaultRapierContext>,
-    >,
+    mut rapier_context: WriteRapierContext,
+    mut rapier_config_q: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
     mut robot_set: ResMut<RobotSet>,
 ) {
-    let (mut rapier_config, mut rapier_context) = rapier_config_q.single_mut();
+    let mut rapier_context = rapier_context.single_mut();
+    let mut rapier_config = rapier_config_q.single_mut();
     for event in events.update_drain() {
         match event {
             SimulationEvent::SimulationAction(action) => {
                 match action {
                     SimulationAction::Load => {
-                        let resetted_ctx =
-                            bincode::deserialize::<RapierContext>(&snapshot.rapier_context).unwrap();
-                        let _ = std::mem::replace(rapier_context.deref_mut(), resetted_ctx);
+                        let (
+                            simulation,
+                            colliders,
+                            joints,
+                            query_pipeline,
+                            rigidbody_set,
+                        ) = bincode::deserialize::<RapierContextTuple>(&snapshot.rapier_context).unwrap();
+                        let _ = std::mem::replace(&mut *rapier_context.simulation, simulation);
+                        let _ = std::mem::replace(&mut *rapier_context.colliders, colliders);
+                        let _ = std::mem::replace(&mut *rapier_context.joints, joints);
+                        let _ = std::mem::replace(&mut *rapier_context.query_pipeline, query_pipeline);
+                        let _ = std::mem::replace(&mut *rapier_context.rigidbody_set, rigidbody_set);
                         // Reset robot transforms
                         let resetted_robot_set = bincode::deserialize::<RobotSet>(&snapshot.robot_set).unwrap();
                         for robot_data in resetted_robot_set.robots.iter().map(|v| v.1) {
@@ -147,7 +155,17 @@ pub fn handle_simulation_events(
                     SimulationAction::Save => {
                         snapshot.rapier_context.clear();
                         snapshot.robot_set.clear();
-                        snapshot.rapier_context.append(&mut bincode::serialize(&*rapier_context).unwrap());
+                        snapshot.rapier_context.append(
+                            &mut bincode::serialize(
+                                &(
+                                    rapier_context.simulation.deref(),
+                                    rapier_context.colliders.deref(),
+                                    rapier_context.joints.deref(),
+                                    rapier_context.query_pipeline.deref(),
+                                    rapier_context.rigidbody_set.deref(),
+                                )
+                            ).unwrap()
+                        );
                         snapshot.robot_set.append(&mut bincode::serialize(&*robot_set).unwrap());
                     }
                 }

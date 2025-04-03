@@ -8,28 +8,29 @@ bevy = { version = "0.15.3", features = ["serialize"] }
 bevy-inspector-egui = "0.29.1"
 bevy_egui = { version = "0.33.0", features = ["render"] }
 bevy_flycam = "0.15.0"
-bevy_rapier3d = { version = "0.28.0", features = ["serde-serialize"] }
+bevy_rapier3d = { version = "0.29.0", features = ["serde-serialize", "parallel"] }
 serde = "1.0.217"
 bevy_salva3d = { git = "https://github.com/nsjvidana/bevy_salva.git", rev = "9e97453", features = ["rapier"] }
 rfd = "0.15.2"
-rapier3d-urdf = { version = "0.3.0", features = ["stl"] }
+rapier3d-urdf = { version = "0.4.0", features = ["stl"] }
 bincode = "1.3.3"
 openrr-planner = "0.1.0"
-urdf-rs = { version = "0.6.9", features = ["transmission"] }
+urdf-rs = { version = "0.9.0", features = ["transmission"] }
 xurdf = "0.2.5"
-k = "0.29.1"
+k = "0.32.0"
 thiserror = "1"
 parking_lot = "0.12.3"
 dyn-clone = "1.0.19"
 
 [patch.crates-io]
-assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
-urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "4710127" }
+#assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
+urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" }
+openrr-planner = { git = "https://github.com/openrr/openrr.git", rev = "bb3e176" }
 
-[profile.dev.package."rapier3d"]
-opt-level = 3
-[profile.dev.package."bevy_rapier3d"]
-opt-level = 3
-
-[profile.dev]
-opt-level = 1
+#[profile.dev.package."rapier3d"]
+#opt-level = 3
+#[profile.dev.package."bevy_rapier3d"]
+#opt-level = 3
+#
+#[profile.dev]
+#opt-level = 1

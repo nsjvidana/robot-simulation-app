@@ -1,4 +1,5 @@
-use bevy::prelude::Event;
+use bevy::prelude::{Event, EventWriter, In};
+use crate::prelude::*;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -24,4 +25,13 @@ pub enum Error {
 pub struct ErrorEvent {
     pub error: Error,
     pub location: Option<String>,
+}
+
+pub fn error_handling_system(
+    In(result): In<Result<()>>,
+    mut events: EventWriter<ErrorEvent>,
+) {
+    if let Err(error) = result {
+        events.send(ErrorEvent { error, location: None });
+    }
 }

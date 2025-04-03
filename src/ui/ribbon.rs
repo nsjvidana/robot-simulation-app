@@ -11,7 +11,7 @@ use bevy_rapier3d::dynamics::{
     ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle,
 };
 use bevy_rapier3d::plugin::RapierContext;
-use bevy_rapier3d::prelude::ReadDefaultRapierContext;
+use bevy_rapier3d::prelude::ReadRapierContext;
 use std::ops::Mul;
 use std::result;
 
