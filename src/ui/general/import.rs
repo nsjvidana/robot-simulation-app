@@ -46,7 +46,7 @@ impl Default for ImportWindow {
         Self {
             is_open: default(),
             import_clicked: default(),
-            mb_loader_options: default(),
+            mb_loader_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
             urdf_loader_options: UrdfLoaderOptions {
                 create_colliders_from_visual_shapes: true,
                 create_colliders_from_collision_shapes: false,
