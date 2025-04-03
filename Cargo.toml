@@ -21,16 +21,12 @@ k = "0.32.0"
 thiserror = "1"
 parking_lot = "0.12.3"
 dyn-clone = "1.0.19"
+bevy_infinite_grid = "0.14.1"
 
 [patch.crates-io]
 #assimp-sys = { git = "https://github.com/nsjvidana/assimp-sys.git", rev = "1eea58d" }
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" }
 openrr-planner = { git = "https://github.com/openrr/openrr.git", rev = "bb3e176" }
 
-#[profile.dev.package."rapier3d"]
-#opt-level = 3
-#[profile.dev.package."bevy_rapier3d"]
-#opt-level = 3
-#
-#[profile.dev]
-#opt-level = 1
+[profile.dev]
+opt-level = 1

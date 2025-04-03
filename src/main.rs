@@ -18,6 +18,7 @@ use bevy_rapier3d::{
     prelude::{Collider, RigidBody},
 };
 use std::ops::DerefMut;
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 pub mod convert;
 pub mod error;
@@ -39,7 +40,10 @@ fn main() {
     });
     app.add_event::<ErrorEvent>();
 
-    app.add_plugins(DefaultPlugins);
+    app.add_plugins((
+        DefaultPlugins,
+        InfiniteGridPlugin,
+    ));
     app.add_plugins((
         GeneralTabPlugin::new(FixedUpdate),
         MotionPlanningPlugin::new(FixedUpdate),
@@ -85,17 +89,20 @@ pub fn update(mut robot_q: Query<&mut Transform, With<Robot>>, keys: Res<ButtonI
 }
 
 pub fn startup(mut commands: Commands) {
-    //camera
+    // Camera
     commands.spawn((
-        Transform::from_xyz(-2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(-10., 10., 10.).looking_at(Vec3::ZERO, Vec3::Y),
         Camera3d::default(),
         FlyCam,
     ));
+
+    // Infinite grid
+    commands.spawn(InfiniteGridBundle::default());
 
     //ground
     commands.spawn((
         RigidBody::Fixed,
         Collider::cuboid(10., 0.1, 10.),
-        Transform::from_xyz(0., -5., 0.),
+        Transform::from_xyz(0., -0.1, 0.),
     ));
 }

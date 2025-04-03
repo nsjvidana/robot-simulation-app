@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bevy::app::App;
 use bevy::core::Name;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
-use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystem, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
+use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystem, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, Transform, With};
 use bevy_rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::error::{error_handling_system, Error, ErrorEvent};
@@ -103,6 +103,7 @@ pub fn import_robots(
                 }
             },
             Name::new(robot_name),
+            Transform::from_xyz(0., 1., 0.),
         ));
     }
     Ok(())
