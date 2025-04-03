@@ -3,14 +3,13 @@ mod ik;
 use crate::motion_planning::{Instruction, InstructionObject, PlanEvent};
 use crate::prelude::*;
 use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
-use bevy::prelude::{default, Entity, ResMut, Resource};
+use bevy::prelude::{default, Entity, Resource};
 use bevy_egui::egui;
-use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Rgba, Ui};
+use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Ui};
+use ik::InverseKinematicsWindow;
+use parking_lot::Mutex;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use parking_lot::Mutex;
-use ik::InverseKinematicsWindow;
-use crate::motion_planning::PlanEvent::CreatePlanEvent;
 
 #[derive(Default)]
 pub struct MotionPlanning {

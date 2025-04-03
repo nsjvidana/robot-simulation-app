@@ -1,5 +1,9 @@
 use crate::error::ErrorEvent;
+use crate::general::GeneralTabPlugin;
+use crate::motion_planning::MotionPlanningPlugin;
 use crate::prelude::*;
+use bevy::app::PostUpdate;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Time, Update, With};
 use bevy::{
     app::App,
@@ -8,22 +12,12 @@ use bevy::{
     DefaultPlugins,
 };
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteRapierContext};
 use bevy_rapier3d::{
     plugin::RapierPhysicsPlugin,
     prelude::{Collider, RigidBody},
 };
-use k::SerialChain;
 use std::ops::DerefMut;
-use std::sync::Arc;
-use bevy::app::PostUpdate;
-use bevy::ecs::system::SystemParam;
-use bevy::gizmos::GizmoPlugin;
-use bevy_egui::EguiPlugin;
-use parking_lot::Mutex;
-use crate::general::GeneralTabPlugin;
-use crate::motion_planning::MotionPlanningPlugin;
 
 pub mod convert;
 pub mod error;

@@ -1,12 +1,12 @@
 use crate::general::ImportEvent;
+use crate::prelude::*;
 use crate::ui::{RobotLabUiAssets, UiEvents, UiResources, View, WindowUI, TOOLTIP_LAYER};
 use bevy::prelude::{default, Resource};
 use bevy_egui::egui;
 use bevy_egui::egui::{ComboBox, Context, Ui};
+use bevy_rapier3d::na::{Isometry3, Vector3};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::path::PathBuf;
-use bevy_rapier3d::na::{Isometry, Isometry3, Vector, Vector3};
-use crate::prelude::*;
 
 #[derive(Resource, Default)]
 pub struct Import {

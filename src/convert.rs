@@ -1,18 +1,18 @@
 use crate::prelude::*;
 use bevy::prelude::{Component, Entity, GlobalTransform};
 use bevy_rapier3d::geometry::ActiveHooks;
+use bevy_rapier3d::math::{Real, Vect};
 use bevy_rapier3d::na::{ArrayStorage, Matrix3, Vector, Vector3};
-use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, CollisionEvent, ContactForceEvent, Group, RapierContextMut};
+use bevy_rapier3d::parry::math::AngVector;
+use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, Group};
 use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::prelude::{
-    CCDSolver, ColliderHandle, ColliderSet, DefaultBroadPhase, EventHandler, ImpulseJointHandle,
-    ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointHandle, MultibodyJointSet,
-    NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyHandle, RigidBodySet,
+    ColliderHandle, ColliderSet, ImpulseJointHandle,
+    ImpulseJointSet, MultibodyJointHandle, MultibodyJointSet
+    , RigidBodyHandle, RigidBodySet,
 };
-use std::collections::HashMap;
-use bevy_rapier3d::math::{Real, Vect};
-use bevy_rapier3d::parry::math::AngVector;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 impl Into<Vect> for W<AngVector<Real>> {
     fn into(self) -> Vect {
