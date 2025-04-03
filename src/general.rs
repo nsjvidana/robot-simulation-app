@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use bevy::app::App;
 use bevy::core::Name;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
-use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
+use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystem, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, With};
 use bevy_rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use crate::error::{Error, ErrorEvent};
-use crate::prelude::{RapierContextTuple, Robot, RobotSet};
+use crate::error::{error_handling_system, Error, ErrorEvent};
+use crate::prelude::*;
 use crate::ui::general::import::ImportJointType;
 
 pub struct GeneralTabPlugin {
@@ -33,7 +33,8 @@ impl Plugin for GeneralTabPlugin {
 
         app.add_systems(
             PostUpdate,
-            import_robots,
+            import_robots
+                .pipe(error_handling_system),
         );
 
         app.add_systems(
@@ -77,37 +78,34 @@ pub enum SimulationAction {
 pub fn import_robots(
     mut commands: Commands,
     mut imports: ResMut<Events<ImportEvent>>,
-    mut errors: EventWriter<ErrorEvent>,
-) {
-    crate::send_err_events! {
-        errors,
-        {
-            for import in imports.drain() {
-                let path = PathBuf::from(&import.file_path);
-                let robot_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-                let robot_urdf = urdf_rs::read_file(&path)
-                    .map_err(|e| Error::Urdf {
-                        error: e.to_string(),
-                        robot_name: "<Unknown Robot>".to_string(),
-                    })?;
+) -> Result<()> {
+    for import in imports.drain() {
+        let path = PathBuf::from(&import.file_path);
+        let robot_name = path.file_stem().unwrap().to_str().unwrap().to_string();
+        let robot_urdf = urdf_rs::read_file(&path)
+            .map_err(|e| Error::Urdf {
+                error: e.to_string(),
+                robot_name: "<Unknown Robot>".to_string(),
+            })?;
 
-                let mesh_dir = import.mesh_dir;
-                let mesh_dir =
-                    if mesh_dir.exists() && mesh_dir.is_dir() { Some(mesh_dir) } else { None };
-                let robot_cmp = Robot::new(robot_urdf, import.urdf_loader_options, path.clone(), mesh_dir);
-                commands.spawn((
-                    match import.import_joint_type {
-                        ImportJointType::Impulse => robot_cmp.with_impulse_joints(),
-                        ImportJointType::Multibody => {
-                            robot_cmp.with_multibody_joints(import.mb_loader_options)
-                        }
-                    },
-                    Name::new(robot_name),
-                ));
-            }
-            Ok(())
+        let mesh_dir = import.mesh_dir;
+        if !mesh_dir.display().to_string().is_empty() && !mesh_dir.is_dir() {
+            return Err(Error::FailedOperation("Import failed: robot mesh directory isn't a directory!".to_string()))
         }
+        let mesh_dir =
+            if mesh_dir.exists() { Some(mesh_dir) } else { None };
+        let robot_cmp = Robot::new(robot_urdf, import.urdf_loader_options, path.clone(), mesh_dir);
+        commands.spawn((
+            match import.import_joint_type {
+                ImportJointType::Impulse => robot_cmp.with_impulse_joints(),
+                ImportJointType::Multibody => {
+                    robot_cmp.with_multibody_joints(import.mb_loader_options)
+                }
+            },
+            Name::new(robot_name),
+        ));
     }
+    Ok(())
 }
 
 #[derive(Default)]
