@@ -1,3 +1,4 @@
+use std::ops::Mul;
 use bevy_rapier3d::dynamics::JointAxesMask;
 use bevy_rapier3d::na::Isometry3;
 use crate::prelude::*;
@@ -15,7 +16,10 @@ impl W<&rapier::prelude::GenericJoint> {
                 [0., 0., 0., self.as_revolute().unwrap().angle(&rb1.rotation, &rb2.rotation), 0., 0.]
             },
             JointAxesMask::LOCKED_PRISMATIC_AXES => {
-                [(rb2.translation.vector - rb1.translation.vector).norm(), 0., 0., 0., 0., 0.]
+                let par = rb1 * self.local_frame1;
+                let child = rb2 * self.local_frame2;
+                let diff = par.inverse() * child;
+                [diff.translation.vector.x, 0., 0., 0., 0., 0.]
             },
             _ => unimplemented!()
         }
