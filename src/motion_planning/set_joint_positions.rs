@@ -1,4 +1,5 @@
 use std::ops::DerefMut;
+use approx::relative_eq;
 use bevy::prelude::Entity;
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierContextMut};
 use bevy_rapier3d::rapier::prelude::{ImpulseJointHandle, MultibodyJointHandle, SPATIAL_DIM};
@@ -9,7 +10,27 @@ use crate::prelude::*;
 #[derive(Clone)]
 pub struct SetJointPositionsInstruction {
     pub joints_and_positions: Vec<(Entity, [Real; 6])>,
+    pub eps: Real,
     finished: bool
+}
+
+impl SetJointPositionsInstruction {
+    pub fn new(joints_and_positions: Vec<(Entity, [Real; 6])>) -> Self {
+        Self {
+            joints_and_positions,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SetJointPositionsInstruction {
+    fn default() -> Self {
+        Self {
+            joints_and_positions: vec![],
+            eps: 0.001,
+            finished: false
+        }
+    }
 }
 
 impl Instruction for SetJointPositionsInstruction {
@@ -29,15 +50,18 @@ impl Instruction for SetJointPositionsInstruction {
             ..
         } = context.joints.deref_mut();
         let bodies = &mut context.rigidbody_set.bodies;
+        // Iterate over all joints and their target positions in all 6 degrees of freedom
         for (joint_idx, positions) in robot_entities.link_entities
             .iter()
             .enumerate()
-            .map(|v|(
-                v.0,
-                self.joints_and_positions.iter()
-                    .find(|(joint, _)| *joint == v.1.rigid_body)
-                    .map(|v| v.1)
-             ))
+            .map(|v| {
+                (
+                    v.0,
+                    self.joints_and_positions.iter()
+                        .find(|(joint, _)| *joint == v.1.rigid_body)
+                        .map(|v| v.1)
+                )
+            })
             .filter(|(_, positions)| positions.is_some())
             .map(|(joint_idx, positions)| (joint_idx, positions.unwrap()))
         {
@@ -54,14 +78,18 @@ impl Instruction for SetJointPositionsInstruction {
                     &mut mb.link_mut(link_id).unwrap().joint.data
                 }
             };
+
+            // Setting target positions & counting num of joints that reach their target.
+            let curr_joint_positions = W(&*joint).get_joint_position(
+                bodies.get(link_data.link1).unwrap().position(),
+                bodies.get(link_data.link2).unwrap().position(),
+            );
             for motor_idx in 0..SPATIAL_DIM {
                 if (joint.motor_axes.bits() & 1 << motor_idx) != 0 {
-                    joint.motors[motor_idx].target_pos = positions[motor_idx];
-                    let curr_pos = W(&*joint).get_joint_position(
-                        bodies.get(link_data.link1).unwrap().position(),
-                        bodies.get(link_data.link2).unwrap().position(),
-                    );
-                    if positions == curr_pos {
+                    let target_motor_pos = positions[motor_idx];
+                    joint.motors[motor_idx].target_pos = target_motor_pos;
+                    let curr_pos = curr_joint_positions[motor_idx];
+                    if relative_eq!(curr_pos, target_motor_pos, epsilon = self.eps) {
                         finished_joints += 1;
                     }
                 }

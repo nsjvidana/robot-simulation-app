@@ -1,5 +1,5 @@
 pub mod wait;
-mod set_joint_positions;
+pub mod set_joint_positions;
 
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;

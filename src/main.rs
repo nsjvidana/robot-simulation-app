@@ -101,9 +101,9 @@ pub fn startup(mut commands: Commands) {
     commands.spawn(InfiniteGridBundle::default());
 
     //ground
-    commands.spawn((
-        RigidBody::Fixed,
-        Collider::cuboid(10., 0.1, 10.),
-        Transform::from_xyz(0., -0.1, 0.),
-    ));
+    // commands.spawn((
+    //     RigidBody::Fixed,
+    //     Collider::cuboid(10., 0.1, 10.),
+    //     Transform::from_xyz(0., -0.1, 0.),
+    // ));
 }

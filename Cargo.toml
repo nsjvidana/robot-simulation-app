@@ -22,6 +22,7 @@ thiserror = "1"
 parking_lot = "0.12.3"
 dyn-clone = "1.0.19"
 bevy_infinite_grid = "0.14.1"
+approx = "0.5.1"
 
 [patch.crates-io]
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" } # URDF transmissions support
