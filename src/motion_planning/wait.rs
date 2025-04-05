@@ -1,4 +1,5 @@
 use std::time::Duration;
+use bevy::prelude::Entity;
 use crate::motion_planning::Instruction;
 use crate::PhysicsData;
 use crate::prelude::{RapierRobotHandles, Robot, RobotEntities};
@@ -11,7 +12,7 @@ pub struct WaitInstruction {
 }
 
 impl Instruction for WaitInstruction {
-    fn execute(&mut self, _robot: &Robot, _rapier_handles: &RapierRobotHandles, _robot_entities: &RobotEntities, physics: &PhysicsData) {
+    fn execute(&mut self, robot: &Robot, rapier_context_entity: Entity, rapier_handles: &RapierRobotHandles, robot_entities: &RobotEntities, physics: &mut PhysicsData) {
         self.time_waited += physics.time.delta();
         if self.time_waited >= self.delay {
             self.finished = true;

@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use bevy::prelude::{Component, Entity, GlobalTransform};
+use bevy::prelude::{Component, Entity, GlobalTransform, Mut, Res, Time};
 use bevy_rapier3d::geometry::ActiveHooks;
 use bevy_rapier3d::math::{Real, Vect};
 use bevy_rapier3d::na::{ArrayStorage, Matrix3, Vector, Vector3};
 use bevy_rapier3d::parry::math::AngVector;
-use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, Group};
+use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, Group, RapierContextMut, RapierContextSimulation, RapierQueryPipeline};
 use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::prelude::{
     ColliderHandle, ColliderSet, ImpulseJointHandle,
@@ -17,6 +17,31 @@ use std::collections::HashMap;
 impl Into<Vect> for W<AngVector<Real>> {
     fn into(self) -> Vect {
         Vect::new(self.x, self.y, self.z)
+    }
+}
+
+impl<'w> Into<RapierContextMut<'w>> for W<(
+    Mut<'w, RapierContextSimulation>,
+    Mut<'w, bevy_rapier3d::prelude::RapierContextColliders>,
+    Mut<'w, bevy_rapier3d::prelude::RapierContextJoints>,
+    Mut<'w, RapierQueryPipeline>,
+    Mut<'w, bevy_rapier3d::prelude::RapierRigidBodySet>,
+)> {
+    fn into(self) -> RapierContextMut<'w> {
+        let W((
+            simulation,
+            colliders,
+            joints,
+            query_pipeline,
+            rigidbody_set,
+        )) = self;
+        RapierContextMut {
+            simulation,
+            colliders,
+            joints,
+            query_pipeline,
+            rigidbody_set,
+        }
     }
 }
 

@@ -116,7 +116,7 @@ pub struct RobotKinematics {
 
 #[derive(Serialize, Deserialize)]
 pub struct RobotEntities {
-    link_entities: Vec<RobotLink>,
+    pub link_entities: Vec<RobotLink>,
 }
 
 #[derive(Component)]
@@ -132,7 +132,7 @@ pub struct RobotPart(pub Entity);
 
 #[derive(Serialize, Deserialize)]
 pub struct RobotLink {
-    rigid_body: Entity,
-    colliders: Vec<Entity>,
-    initial_pos: Transform,
+    pub rigid_body: Entity,
+    pub colliders: Vec<Entity>,
+    pub initial_pos: Transform,
 }

@@ -12,7 +12,7 @@ use bevy::{
     DefaultPlugins,
 };
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
-use bevy_rapier3d::prelude::{DefaultRapierContext, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteRapierContext};
+use bevy_rapier3d::prelude::{DefaultRapierContext, ImpulseJoint, MultibodyJoint, RapierConfiguration, RapierDebugRenderPlugin, TimestepMode, WriteRapierContext};
 use bevy_rapier3d::{
     plugin::RapierPhysicsPlugin,
     prelude::{Collider, RigidBody},
@@ -30,6 +30,7 @@ pub mod robot;
 pub mod ui;
 pub mod motion_planning;
 mod general;
+mod impls;
 
 fn main() {
     let mut app = App::new();
@@ -72,7 +73,7 @@ fn main() {
 
 #[derive(SystemParam)]
 pub struct PhysicsData<'w, 's> {
-    ctx: WriteRapierContext<'w, 's>,
+    ctx: WriteRapierContext<'w, 's, ()>,
     ctx_config: Query<'w, 's, &'static mut RapierConfiguration, With<DefaultRapierContext>>,
     time: Res<'w, Time>
 }

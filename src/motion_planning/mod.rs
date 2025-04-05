@@ -1,11 +1,13 @@
 pub mod wait;
+mod set_joint_positions;
 
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::PhysicsSet;
+use bevy_rapier3d::plugin::DefaultRapierContext;
+use bevy_rapier3d::prelude::{PhysicsSet, RapierContextEntityLink};
 use dyn_clone::DynClone;
 use parking_lot::{Mutex, MutexGuard};
 use crate::general::SimulationEvent;
@@ -108,9 +110,10 @@ pub trait Instruction: Send + Sync + DynClone {
     fn execute(
         &mut self,
         robot: &Robot,
+        rapier_context_entity: Entity,
         rapier_handles: &RapierRobotHandles,
         robot_entities: &RobotEntities,
-        physics: &PhysicsData,
+        physics: &mut PhysicsData,
     );
 
     fn is_finished(&self) -> bool;
@@ -184,15 +187,24 @@ pub fn plan_execution_prep(
 
 pub fn run_plans(
     mut state: ResMut<RunPlansState>,
-    physics: PhysicsData,
-    robots: Query<(&Plan, &Robot, &RobotHandle, &RapierRobotHandles)>,
+    mut physics: PhysicsData,
+    default_context_q: Query<Entity, With<DefaultRapierContext>>,
+    robots: Query<(&Plan, &Robot, Option<&RapierContextEntityLink>, &RobotHandle, &RapierRobotHandles)>,
+
     robot_set: Res<RobotSet>,
 ) {
     if !state.physics_active {
         return;
     }
 
-    for (plan, robot, robot_handle, rapier_handles) in robots.iter() {
+    for (
+        plan,
+        robot,
+        ctx_link,
+        robot_handle,
+        rapier_handles
+    ) in robots.iter() {
+        let context_link = ctx_link.map_or_else(|| default_context_q.single(), |link| link.0);
         let mut instructions = plan.instructions.lock();
         for mut instruction in instructions
             .iter()
@@ -202,9 +214,10 @@ pub fn run_plans(
             if instruction.is_finished() { continue; }
             instruction.execute(
                 robot,
+                context_link,
                 rapier_handles,
                 &robot_set.robots.get(robot_handle.0).unwrap().entities,
-                &physics
+                &mut physics
             );
             if !instruction.is_finished() { break; }
         }
