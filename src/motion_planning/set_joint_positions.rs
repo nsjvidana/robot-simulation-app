@@ -10,6 +10,7 @@ use crate::prelude::*;
 #[derive(Clone)]
 pub struct SetJointPositionsInstruction {
     pub joints_and_positions: Vec<(Entity, [Real; 6])>,
+    /// The margin of error for checking when joints have reached their target position.
     pub eps: Real,
     finished: bool
 }

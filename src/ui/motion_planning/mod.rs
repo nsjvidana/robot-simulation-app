@@ -1,5 +1,7 @@
 mod ik;
 
+pub use ik::*;
+
 use crate::motion_planning::{Instruction, InstructionObject, PlanEvent};
 use crate::prelude::*;
 use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
