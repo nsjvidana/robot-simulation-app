@@ -103,7 +103,6 @@ pub fn import_robots(
                 }
             },
             Name::new(robot_name),
-            Transform::from_xyz(0., 1., 0.),
         ));
     }
     Ok(())

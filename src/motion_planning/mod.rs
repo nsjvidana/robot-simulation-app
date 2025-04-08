@@ -32,7 +32,10 @@ impl Plugin for MotionPlanningPlugin {
             .init_resource::<RunPlansState>();
         app.world_mut().resource_mut::<AllInstructions>()
             .instructions
-            .push(Box::new(wait::WaitInstruction::default()));
+            .append(&mut vec![
+                Box::new(wait::WaitInstruction::default()),
+                Box::new(set_joint_positions::SetJointPositionsInstruction::default())
+            ]);
 
         app.add_systems(
             PostUpdate,

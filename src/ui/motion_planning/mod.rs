@@ -138,6 +138,8 @@ pub struct EditPlanWindow {
     pub remove_instruction_clicked: bool,
     pub cancel_clicked: bool,
     pub save_clicked: bool,
+
+    dragging_instruction: bool,
 }
 
 impl EditPlanWindow {
@@ -169,6 +171,8 @@ impl Default for EditPlanWindow {
             remove_instruction_clicked: default(),
             cancel_clicked: default(),
             save_clicked: default(),
+
+            dragging_instruction: false,
         }
     }
 }
@@ -193,13 +197,34 @@ impl View for EditPlanWindow {
                     .map(|v| v.lock().instruction_name())
                     .enumerate()
                 {
-                    let resp = ui.dnd_drag_source(
-                        Id::new(loc),
-                        loc,
-                        |ui| { let _ = ui.button(instruction); },
-                    ).response;
+                    let (item_resp, resp) = ui.horizontal(|ui| {
+                        let instruction_ui_id = Id::new(loc);
+                        let item_resp =
+                            if !self.dragging_instruction {
+                                Some(ui.button(instruction))
+                            }
+                            else {
+                                None
+                            };
+                        let resp = ui.dnd_drag_source(
+                            instruction_ui_id,
+                            loc,
+                            |ui| {
+                                if self.dragging_instruction {
+                                    let _ = ui.button(instruction);
+                                }
+                                ui.label("---")
+                            },
+                        ).response;
+                        self.dragging_instruction = ui.ctx().is_being_dragged(instruction_ui_id);
+                        (item_resp, resp)
+                    }).inner;
 
-                    // Detect items held over this item in the instructions list
+                    if item_resp.is_some_and(|v| v.double_clicked()) {
+                        // TODO: allow user to edit this instruction.
+                    }
+
+                    // Detect items held over the instructions list
                     if let (Some(pointer), Some(hovered_payload)) = (
                         ui.input(|i| i.pointer.interact_pos()),
                         resp.dnd_hover_payload::<usize>(),
@@ -243,10 +268,10 @@ impl View for EditPlanWindow {
 
         if let (Some(from), Some(mut to)) = (from, to) {
             to -= (*from < to) as usize;
-            let item_order_pos = instructions.remove(*from);
+            let moved_instruction = instructions.remove(*from);
 
             to = to.min(instructions.len());
-            instructions.insert(to, item_order_pos);
+            instructions.insert(to, moved_instruction);
         }
 
         self.new_instruction_modal.ui(ui, ui_assets);
