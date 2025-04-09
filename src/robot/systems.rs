@@ -11,6 +11,7 @@ use rapier3d_urdf::{UrdfJointHandle, UrdfRobot, UrdfRobotHandles};
 use std::ops::DerefMut;
 use std::path::Path;
 use bevy_rapier3d::na::Isometry3;
+use crate::motion_planning::set_joint_positions::SetJointPositionsInstruction;
 use crate::prelude::ik::KinematicNode;
 
 pub fn init_robots(
@@ -379,17 +380,20 @@ fn create_rapier_robot_entities(
 }
 
 pub fn sync_robot_changes(
-    mut changed_robot_transforms_q: Query<
-        (&GlobalTransform, &RobotHandle),
+    robot_transform_q: Query<&GlobalTransform, With<Robot>>,
+    changed_robot_transforms_q: Query<
+        (Entity, &RobotHandle),
         (With<Robot>, Changed<GlobalTransform>),
     >,
     mut rb_transform_q: Query<
         &mut GlobalTransform,
         (With<RigidBody>, With<RobotPart>, Without<Robot>),
     >,
+    mut robot_kinematics: Query<&RobotKinematics>,
     mut robot_set: ResMut<RobotSet>,
 ) {
-    for (new_transform, robot_handle) in changed_robot_transforms_q.iter() {
+    for (robot_entity, robot_handle) in changed_robot_transforms_q.iter() {
+        let new_transform = robot_transform_q.get(robot_entity).unwrap();
         let RobotSerData {
             entities: robot_entities,
             transform: ser_transform,
@@ -405,5 +409,14 @@ pub fn sync_robot_changes(
             *rb_transform = new_transform.mul_transform(*initial_pos);
         }
         *ser_transform = *new_transform;
+
+        let kinematics = robot_kinematics.get(robot_entity).unwrap();
+        let transform = Transform::from(*robot_transform_q.get(robot_entity).unwrap());
+        let t = transform.translation;
+        let r = transform.rotation;
+        kinematics.chain.set_origin(k::Isometry3 {
+            translation: k::Translation3::new(t.x, t.y, t.z),
+            rotation: k::UnitQuaternion::new_unchecked(k::nalgebra::Quaternion::from(r.to_array())),
+        });
     }
 }
