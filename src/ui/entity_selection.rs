@@ -78,7 +78,7 @@ pub struct EntitySelectionResources<'w, 's> {
 }
 
 /// An enum that tells how the pointer using the Positioning tools
-#[derive(Default, Debug)]
+#[derive(PartialEq, Default, Debug)]
 pub enum PointerUsageState {
     UsingTool,
     UiUsingPointer,
@@ -353,6 +353,7 @@ pub fn select_entities(
         return;
     }
 
+    return;
     match selected_entities.selection_mode {
         EntitySelectionMode::SelectOneRobot => {
             selected_entities.selected_robots.clear();
@@ -458,26 +459,50 @@ pub fn handle_selection_requests(
     let shift_pressed =
         keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
+    let clicked_entity = entity_selection_resources
+        .selected_entities
+        .hovered_entities
+        .first()
+        .cloned();
+
+    let selected_entities = &mut entity_selection_resources.selected_entities;
+    if selected_entities.pointer_usage_state == PointerUsageState::NotUsed && selection_server.requests.len() == 0 {
+        let Some(clicked_entity) = clicked_entity else {
+            selected_entities.selected_robots.clear();
+            selected_entities.active_robot = None;
+            return;
+        };
+        if let Ok((robot_part, _)) = entity_selection_resources.robot_part_q.get(clicked_entity) {
+            if !shift_pressed {
+                selected_entities.selected_robots.clear();
+            }
+            selected_entities.selected_robots.push(robot_part.0);
+            selected_entities.active_robot = Some(robot_part.0);
+        }
+        else {
+            selected_entities.selected_robots.clear();
+            selected_entities.active_robot = None;
+        }
+        return;
+    }
+
+    let Some(clicked_entity) = entity_selection_resources
+        .selected_entities
+        .hovered_entities
+        .first()
+        .cloned()
+    else {
+        return;
+    };
+
     let mut requests = Vec::new();
-    requests.append(&mut selection_server.requests);
+        requests.append(&mut selection_server.requests);
     for request in requests.into_iter() {
         let mut resp = request.response.lock();
         // Don't add this request back if it was canceled
         if resp.is_canceled() {
             continue;
         }
-
-        let Some(clicked_entity) = entity_selection_resources
-            .selected_entities
-            .hovered_entities
-            .first()
-            .cloned()
-        else {
-            // If no entity was clicked, add this request back and leave it alone.
-            std::mem::drop(resp);
-            selection_server.requests.push(request);
-            continue;
-        };
 
         // If the clicked entity meets the selection critera for this request, finish the request
         // and don't add it back since it has been dealt with.
