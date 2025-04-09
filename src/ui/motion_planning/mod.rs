@@ -1,5 +1,7 @@
 mod ik;
+mod set_joint_positions;
 
+use std::any::Any;
 pub use ik::*;
 
 use crate::motion_planning::{Instruction, InstructionObject, PlanEvent};
@@ -12,6 +14,7 @@ use ik::InverseKinematicsWindow;
 use parking_lot::Mutex;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use crate::ui::motion_planning::set_joint_positions::SetJointPositionsWindow;
 
 #[derive(Default)]
 pub struct MotionPlanning {
@@ -20,6 +23,7 @@ pub struct MotionPlanning {
     edit_plan_open: bool,
     ik_window: InverseKinematicsWindow,
     edit_plan_window: EditPlanWindow,
+    set_joint_positions_window: SetJointPositionsWindow,
     //RRT?
     //Vehicle controller?
 }
@@ -104,6 +108,8 @@ impl View for MotionPlanning {
         }
 
         EditPlanWindow::functionality(resources, events)?;
+        SetJointPositionsWindow::functionality(resources, events)?;
+        InverseKinematicsWindow::functionality(resources, events)?;
         // TODO: InverseKinematicsWindow::functionality(resources, events)?;
 
         Ok(())
@@ -114,6 +120,7 @@ impl WindowUI for MotionPlanning {
     fn window_ui(&mut self, egui_ctx: &mut Context, ui_assets: &RobotLabUiAssets) {
         self.ik_window.window_ui(egui_ctx, ui_assets);
         self.edit_plan_window.window_ui(egui_ctx, ui_assets);
+        self.set_joint_positions_window.window_ui(egui_ctx, ui_assets);
     }
 }
 
@@ -140,6 +147,7 @@ pub struct EditPlanWindow {
     pub save_clicked: bool,
 
     dragging_instruction: bool,
+    double_clicked_instruction: Option<InstructionObject>,
 }
 
 impl EditPlanWindow {
@@ -173,6 +181,7 @@ impl Default for EditPlanWindow {
             save_clicked: default(),
 
             dragging_instruction: false,
+            double_clicked_instruction: None,
         }
     }
 }
@@ -194,34 +203,36 @@ impl View for EditPlanWindow {
             ui.vertical_centered(|ui| {
                 for (loc, instruction) in instructions
                     .iter()
-                    .map(|v| v.lock().instruction_name())
+                    .map(|v| v.lock())
                     .enumerate()
                 {
+                    let instruction_name = instruction.instruction_name();
                     let (item_resp, resp) = ui.horizontal(|ui| {
                         let instruction_ui_id = Id::new(loc);
-                        let item_resp =
-                            if !self.dragging_instruction {
-                                Some(ui.button(instruction))
-                            }
-                            else {
-                                None
-                            };
                         let resp = ui.dnd_drag_source(
                             instruction_ui_id,
                             loc,
                             |ui| {
+                                ui.label("---");
                                 if self.dragging_instruction {
-                                    let _ = ui.button(instruction);
+                                    let _ = ui.button(instruction_name);
                                 }
-                                ui.label("---")
                             },
                         ).response;
+                        let item_resp =
+                            if !self.dragging_instruction {
+                                Some(ui.button(instruction_name))
+                            }
+                            else {
+                                None
+                            };
                         self.dragging_instruction = ui.ctx().is_being_dragged(instruction_ui_id);
                         (item_resp, resp)
                     }).inner;
 
                     if item_resp.is_some_and(|v| v.double_clicked()) {
-                        // TODO: allow user to edit this instruction.
+                        // Prepare insturction to send an EditInstructionEvent
+                        self.double_clicked_instruction = Some(instructions[loc].clone());
                     }
 
                     // Detect items held over the instructions list
@@ -294,14 +305,6 @@ impl View for EditPlanWindow {
             let mut instructions_list = window.instructions.lock();
             instructions_list.clear();
             instructions_list.append(&mut window.display_instructions.clone());
-            // events.plan_events.send(PlanEvent::ReorderInstructions {
-            //     robot_entity: window.target_robot,
-            //     instruction_order: window.display_instructions
-            //         .iter()
-            //         .enumerate()
-            //         .map(|v| v.0)
-            //         .collect()
-            // });
         }
 
         if window.add_instruction_clicked {
@@ -314,6 +317,9 @@ impl View for EditPlanWindow {
                 );
         }
 
+        if let Some(instruction) = window.double_clicked_instruction.take() {
+            events.plan_events.send(PlanEvent::EditInstructionEvent(instruction));
+        }
         NewInstructionModal::functionality(resources, events)?;
 
         Ok(())

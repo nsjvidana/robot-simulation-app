@@ -1,6 +1,7 @@
 pub mod wait;
 pub mod set_joint_positions;
 
+use std::any::Any;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
@@ -8,6 +9,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::DefaultRapierContext;
 use bevy_rapier3d::prelude::{PhysicsSet, RapierContextEntityLink};
+use downcast_rs::{impl_downcast, Downcast};
 use dyn_clone::DynClone;
 use parking_lot::{Mutex, MutexGuard};
 use crate::general::SimulationEvent;
@@ -89,7 +91,7 @@ impl Plan {
 }
 
 #[derive(Clone)]
-pub struct InstructionObject(pub Arc<Mutex<Box<dyn Instruction>>>);
+pub struct InstructionObject(pub Arc<Mutex<Box<dyn Instruction + 'static>>>);
 
 impl InstructionObject {
     pub fn lock(&self) -> MutexGuard<'_, Box<dyn Instruction>> {
@@ -109,7 +111,7 @@ impl From<Box<dyn Instruction + 'static>> for InstructionObject {
     }
 }
 
-pub trait Instruction: Send + Sync + DynClone {
+pub trait Instruction: Send + Sync + DynClone + Downcast {
     fn execute(
         &mut self,
         robot: &Robot,
@@ -124,8 +126,16 @@ pub trait Instruction: Send + Sync + DynClone {
     fn reset_finished_state(&mut self);
 
     fn instruction_name(&self) -> &'static str;
+
+    /// Constant value used in determining what instruction this is.
+    ///
+    /// Optional.
+    fn instruction_id(&self) -> u64 {
+        ahash::RandomState::with_seeds(1, 2, 3, 4).hash_one(std::any::type_name::<Self>())
+    }
 }
 
+impl_downcast!(Instruction);
 dyn_clone::clone_trait_object!(Instruction);
 
 #[derive(Event)]
@@ -138,6 +148,9 @@ pub enum PlanEvent {
         robot_entity: Entity,
         instruction_order: Vec<usize>
     },
+    /// The u64 in this event is the instruction id telling what type of
+    /// instruction is being edited
+    EditInstructionEvent(InstructionObject)
 }
 
 pub fn sync_plans(
@@ -158,6 +171,7 @@ pub fn sync_plans(
                     .map(|v| instructions.remove(v))
                     .collect();
             },
+            PlanEvent::EditInstructionEvent(_) => {}
         }
     }
 }

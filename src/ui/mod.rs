@@ -14,7 +14,7 @@ use bevy::gizmos::AppGizmoBuilder;
 use bevy::gizmos::GizmoPlugin;
 use bevy::image::Image;
 use bevy::math::Vec3;
-use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, EventWriter, Events, FromWorld, GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, KeyCode, Local, Mat3, MouseButton, Name, NonSendMut, Or, Parent, Plugin, Quat, Query, Ray3d, Reflect, Res, ResMut, Resource, Single, Transform, Window, With, World};
+use bevy::prelude::{AssetServer, ButtonInput, Camera, Color, Commands, Component, DetectChanges, Entity, Event, EventReader, EventWriter, Events, FromWorld, GizmoConfigGroup, GizmoConfigStore, Gizmos, GlobalTransform, IntoSystemConfigs, Isometry3d, KeyCode, Local, Mat3, MouseButton, Name, NonSendMut, Or, Parent, Plugin, Quat, Query, Ray3d, Reflect, Res, ResMut, Resource, Single, Transform, Window, With, World};
 use bevy_egui::egui::{Align, ComboBox, Label, Layout, TextureId, Ui, UiBuilder};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_rapier3d::parry::math::{Isometry, Vector};
@@ -106,6 +106,7 @@ pub struct UiResources<'w, 's> {
 
     // Robot resources
     plan_q: Query<'w, 's, &'static Plan>,
+    robot_q: Query<'w, 's, (&'static Robot, &'static RobotKinematics)>,
 
     instructions: Res<'w, AllInstructions>,
 
@@ -122,7 +123,7 @@ pub struct GizmosUiParameters<'w, 's> {
 
 #[derive(SystemParam)]
 pub struct UiEvents<'w> {
-    plan_events: EventWriter<'w, PlanEvent>,
+    plan_events: ResMut<'w, Events<PlanEvent>>,
     import_events: EventWriter<'w, ImportEvent>,
     simulation_events: EventWriter<'w, SimulationEvent>,
     ik_window_events: ResMut<'w, Events<IkWindowUiEvent>>

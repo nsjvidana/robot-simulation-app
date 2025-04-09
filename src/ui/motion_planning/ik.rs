@@ -1,17 +1,18 @@
-use bevy_egui::egui::{Context, Ui};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use bevy::prelude::{Event, Events, Mut, ResMut, Vec3};
-use bevy_egui::{egui, EguiContexts};
-use derivative::Derivative;
-use k::Isometry3;
-use openrr_planner::{JointPathPlanner, JointPathPlannerBuilder, JointPathPlannerWithIk};
-use parking_lot::Mutex;
 use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::math::Real;
 use crate::prelude::*;
 use crate::ui::{RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
+use bevy::prelude::Event;
+use bevy_egui::egui::{Context, Image, Ui};
+use bevy_egui::egui;
+use derivative::Derivative;
+use k::Isometry3;
+use openrr_planner::{JointPathPlannerBuilder, JointPathPlannerWithIk};
+use parking_lot::Mutex;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use bevy_egui::egui::load::SizedTexture;
 
 #[derive(Derivative)]
 #[derivative(Default)]
@@ -25,12 +26,16 @@ pub struct InverseKinematicsWindow {
     #[derivative(Default(value="HashMap::with_capacity(2)"))]
     solvers: HashMap<IKSolverType, Box<dyn k::InverseKinematicsSolver<Real>>>,
     solve_clicked: bool,
+    end_effector_clicked: bool,
 
     ik_data: Option<IkData>,
 }
 
 impl View for InverseKinematicsWindow {
     fn ui(&mut self, ui: &mut Ui, _ui_assets: &RobotLabUiAssets) {
+        let Some(ik_data) = &self.ik_data else {
+            return;
+        };
         let solver_dropdown = egui::ComboBox::from_label("Solver Type")
             .selected_text(match &self.selected_solver {
                 IKSolverType::Jacobian => "Jacobian",
@@ -48,7 +53,18 @@ impl View for InverseKinematicsWindow {
                     "Cyclic",
                 );
             });
-        if solver_dropdown.response.clicked() {
+        self.solve_clicked = ui.button("Solve").clicked();
+
+        self.end_effector_clicked =
+            if let Some(end_effector) = &ik_data.end_effector {
+                // TODO: add image to end effector btn
+                ui.button("End Effector (Selected)").clicked()
+            }
+            else {
+                ui.button("End Effector").clicked()
+            };
+
+        if solver_dropdown.response.clicked() || self.solve_clicked {
             match self.selected_solver {
                 IKSolverType::Jacobian => {
                     let _ = self.solvers
@@ -62,8 +78,6 @@ impl View for InverseKinematicsWindow {
                 }
             }
         }
-
-        self.solve_clicked = ui.button("Solve").clicked();
     }
 
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
@@ -86,11 +100,19 @@ impl View for InverseKinematicsWindow {
             let Some(ik_data) = &mut ik_window.ik_data else {
                 return Ok(());
             };
+            let Some(end_effector) = ik_data.end_effector.clone() else {
+                return Err(Error::FailedOperation("Inverse Kinematics Failed: End effector not selected!".to_string()));
+            };
+            if !end_effector.is_end() {
+                return Err(Error::FailedOperation("Inverse Kinematics Failed: End effector isn't an end!".to_string()));
+            }
+
             let planner =
                 JointPathPlannerBuilder::from_urdf_robot_with_base_dir(
                     ik_data.urdf.clone(),
                     Some(ik_data.urdf_path.parent().expect("invalid urdf path"))
                 )
+                    .collision_check_margin(0.01)
                     .reference_robot(Arc::new(ik_data.chain.clone()))
                     .finalize()
                     .unwrap();
@@ -99,7 +121,7 @@ impl View for InverseKinematicsWindow {
             let compound = ncollide3d::shape::Compound::new(vec![]);
             // TODO: handle the openrr-planner errors properly.
             *ik_data.positions.lock() = ik_planner
-                .plan_with_ik("target", &ik_data.target_pose, &compound)
+                .plan_with_ik(end_effector.joint().name.as_str(), &ik_data.target_pose, &compound)
                 .map_err(|e| {
                     // Cancel the ik operation if a planning error occurred.
                     *ik_data.is_finished.lock() = false;
@@ -134,6 +156,7 @@ pub struct IkData {
     pub canceled: Arc<Mutex<bool>>,
     pub urdf: urdf_rs::Robot,
     pub urdf_path: PathBuf,
+    pub end_effector: Option<k::Node<Real>>,
 
     pub target_pose: Isometry3<Real>,
     /// Resulting positions from solver. Stored for returning solver result &
@@ -149,6 +172,7 @@ impl From<IkWindowUiEvent> for IkData {
             canceled: event.canceled,
             urdf: event.urdf,
             urdf_path: event.urdf_path,
+            end_effector: None,
 
             target_pose: Isometry3::identity(),
             positions: Arc::new(Mutex::new(vec![])),
