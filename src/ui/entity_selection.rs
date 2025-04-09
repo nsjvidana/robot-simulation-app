@@ -14,6 +14,7 @@ use bevy_rapier3d::plugin::{RapierContext, ReadRapierContext};
 use std::cmp::Ordering;
 use std::sync::Arc;
 use parking_lot::Mutex;
+use crate::prelude::ik::KinematicNode;
 
 #[derive(Resource, Default)]
 pub struct SceneWindowData {
@@ -70,8 +71,10 @@ pub struct EntitySelectionResources<'w, 's> {
             With<RapierMultibodyJointHandle>,
         )>,
     >,
-    robot_q: Query<'w, 's, &'static Robot>,
-    robot_part_q: Query<'w, 's, (&'static RobotPart, Option<&'static Parent>)>,
+    pub robot_q: Query<'w, 's, &'static Robot>,
+    pub robot_part_q: Query<'w, 's, (&'static RobotPart, Option<&'static Parent>)>,
+    pub kinematic_nodes: Query<'w, 's, &'static KinematicNode>,
+    pub selected_entities: ResMut<'w, SelectedEntities>,
 }
 
 /// An enum that tells how the pointer using the Positioning tools
@@ -222,18 +225,17 @@ pub fn update_hovered_entities(
 }
 
 pub fn select_entities(
-    mut selected_entities: ResMut<SelectedEntities>,
     scene_window_data: Res<SceneWindowData>,
     transform_q: Query<&GlobalTransform>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    entity_selection_resources: EntitySelectionResources,
-    mut selection_server: NonSendMut<EntitySelectionServer>,
+    mut entity_selection_resources: EntitySelectionResources,
     mut gizmos: Gizmos<UiGizmoGroup>,
 ) {
     let robot_q = &entity_selection_resources.robot_q;
     let robot_part_q = &entity_selection_resources.robot_part_q;
     let robot_joint_q = &entity_selection_resources.joint_q;
+    let selected_entities = &mut entity_selection_resources.selected_entities;
 
     let alt_pressed = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
     let shift_pressed =
@@ -351,36 +353,6 @@ pub fn select_entities(
         return;
     }
 
-    let mut requests = Vec::new();
-        requests.append(&mut selection_server.requests);
-    for request in requests.into_iter() {
-        let mut resp = request.response.lock();
-        // Don't add this request back if it was canceled
-        if resp.is_canceled() {
-            continue;
-        }
-
-        let Some(clicked_entity) = selected_entities.hovered_entities.first().cloned() else {
-            // If no entity was clicked, add this request back and leave it alone.
-            std::mem::drop(resp);
-            selection_server.requests.push(request);
-            continue;
-        };
-
-        // If the clicked entity meets the selection critera for this request, finish the request
-        // and don't add it back since it has been dealt with.
-        if (request.selection_filter)(clicked_entity, &entity_selection_resources) {
-            resp.entity = Some(clicked_entity);
-            resp.shift_click = shift_pressed;
-            resp.alt_click = alt_pressed;
-        }
-        // If criteria not met, add the request back to the list for it to be completed later on.
-        else {
-            std::mem::drop(resp);
-            selection_server.requests.push(request);
-        }
-    }
-
     match selected_entities.selection_mode {
         EntitySelectionMode::SelectOneRobot => {
             selected_entities.selected_robots.clear();
@@ -465,5 +437,59 @@ pub fn select_entities(
             }
         }
         _ => todo!(),
+    }
+}
+
+pub fn handle_selection_requests(
+    mut entity_selection_resources: EntitySelectionResources,
+    mut selection_server: NonSendMut<EntitySelectionServer>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+) {
+    if !entity_selection_resources.selected_entities.viewport_clicked
+        || matches!(
+            entity_selection_resources.selected_entities.pointer_usage_state,
+            PointerUsageState::UsingTool
+        )
+    {
+        return;
+    }
+
+    let alt_pressed = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
+    let shift_pressed =
+        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+
+    let mut requests = Vec::new();
+    requests.append(&mut selection_server.requests);
+    for request in requests.into_iter() {
+        let mut resp = request.response.lock();
+        // Don't add this request back if it was canceled
+        if resp.is_canceled() {
+            continue;
+        }
+
+        let Some(clicked_entity) = entity_selection_resources
+            .selected_entities
+            .hovered_entities
+            .first()
+            .cloned()
+        else {
+            // If no entity was clicked, add this request back and leave it alone.
+            std::mem::drop(resp);
+            selection_server.requests.push(request);
+            continue;
+        };
+
+        // If the clicked entity meets the selection critera for this request, finish the request
+        // and don't add it back since it has been dealt with.
+        if (request.selection_filter)(clicked_entity, &entity_selection_resources) {
+            resp.entity = Some(clicked_entity);
+            resp.shift_click = shift_pressed;
+            resp.alt_click = alt_pressed;
+        }
+        // If criteria not met, add the request back to the list for it to be completed later on.
+        else {
+            std::mem::drop(resp);
+            selection_server.requests.push(request);
+        }
     }
 }

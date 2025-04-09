@@ -11,6 +11,7 @@ use rapier3d_urdf::{UrdfJointHandle, UrdfRobot, UrdfRobotHandles};
 use std::ops::DerefMut;
 use std::path::Path;
 use bevy_rapier3d::na::Isometry3;
+use crate::prelude::ik::KinematicNode;
 
 pub fn init_robots(
     mut commands: Commands,
@@ -56,6 +57,12 @@ pub fn init_robots(
             &mut commands,
         )?;
 
+        let chain = k::Chain::<Real>::from(robot.urdf.clone());
+        for (node, link) in chain.iter().zip(robot_links.iter()) {
+            commands.entity(link.rigid_body)
+                .insert(KinematicNode(node.clone()));
+        }
+
         let robot_idx = robot_set.robots.insert(RobotSerData {
             robot_entity,
             entities: RobotEntities {
@@ -63,13 +70,14 @@ pub fn init_robots(
             },
             transform: transform.map_or_else(|| GlobalTransform::default(), |v| *v),
         });
+
         commands
             .entity(robot_entity)
             .insert((
                 RobotHandle(robot_idx),
                 RapierRobotHandles(handles),
                 RobotKinematics {
-                    chain: k::Chain::from(robot.urdf.clone()),
+                    chain,
                 },
             ))
             .insert_if_new(Transform::default());

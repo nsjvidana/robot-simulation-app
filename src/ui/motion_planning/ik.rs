@@ -10,9 +10,11 @@ use k::Isometry3;
 use openrr_planner::{JointPathPlannerBuilder, JointPathPlannerWithIk};
 use parking_lot::Mutex;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use bevy_egui::egui::load::SizedTexture;
+use crate::ui::entity_selection::{SelectionRequest, SelectionResponse};
 
 #[derive(Derivative)]
 #[derivative(Default)]
@@ -28,6 +30,7 @@ pub struct InverseKinematicsWindow {
     solve_clicked: bool,
     end_effector_clicked: bool,
 
+    end_effector_selection_response: Option<Arc<Mutex<SelectionResponse>>>,
     ik_data: Option<IkData>,
 }
 
@@ -81,23 +84,55 @@ impl View for InverseKinematicsWindow {
     }
 
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
-        let ik_window = &mut resources.motion_planning_tab.ik_window;
+        let window = &mut resources.motion_planning_tab.ik_window;
 
         // Flag the IK operation as "canceled" if the window was closed
-        if ik_window.was_closed {
-            if let Some(ik_data) = &ik_window.ik_data {
+        if window.was_closed {
+            if let Some(ik_data) = &window.ik_data {
                 *ik_data.is_finished.lock() = false;
                 *ik_data.canceled.lock() = true;
             }
         }
         // Opening the IK window when it is requested.
         for event in events.ik_window_events.drain() {
-            ik_window.open = true;
-            ik_window.ik_data = Some(event.into());
+            window.open = true;
+            window.ik_data = Some(event.into());
         }
 
-        if ik_window.solve_clicked {
-            let Some(ik_data) = &mut ik_window.ik_data else {
+        let Some(ik_data) = &mut window.ik_data else {
+            return Ok(())
+        };
+
+        if window.end_effector_clicked {
+            ik_data.end_effector = None;
+            window.end_effector_selection_response =
+                Some(
+                    SelectionRequest::new(|entity, sel_resources| {
+                        let Some(active_robot) = sel_resources.selected_entities.active_robot else {
+                            return false;
+                        };
+                        sel_resources.robot_part_q.get(entity)
+                            .is_ok_and(|(part, _)| part.0 == active_robot) &&
+                        sel_resources.kinematic_nodes.contains(entity)
+                    })
+                        .send(&mut resources.entity_selection_server)
+                );
+        }
+
+        if let Some(resp) = &window.end_effector_selection_response {
+            if let Some(end_entity) = resp.lock().get_selection() {
+                ik_data.end_effector = Some(
+                    resources.kinematic_nodes
+                        .get(end_entity)
+                        .unwrap()
+                        .deref()
+                        .clone()
+                );
+            }
+        }
+
+        if window.solve_clicked {
+            let Some(ik_data) = &mut window.ik_data else {
                 return Ok(());
             };
             let Some(end_effector) = ik_data.end_effector.clone() else {
@@ -116,7 +151,7 @@ impl View for InverseKinematicsWindow {
                     .reference_robot(Arc::new(ik_data.chain.clone()))
                     .finalize()
                     .unwrap();
-            let solver = ik_window.solvers.remove(&ik_window.selected_solver).unwrap();
+            let solver = window.solvers.remove(&window.selected_solver).unwrap();
             let mut ik_planner = JointPathPlannerWithIk::new(planner, W(solver));
             let compound = ncollide3d::shape::Compound::new(vec![]);
             // TODO: handle the openrr-planner errors properly.

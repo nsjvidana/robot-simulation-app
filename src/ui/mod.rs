@@ -38,6 +38,7 @@ use general::import::Import;
 use general::simulation::Simulation;
 use crate::general::{ImportEvent, SimulationEvent};
 use crate::motion_planning::{AllInstructions, Plan, PlanEvent};
+use crate::prelude::ik::KinematicNode;
 use crate::ui::entity_selection::EntitySelectionServer;
 use crate::ui::general::GeneralTab;
 use crate::ui::motion_planning::{IkWindowUiEvent, MotionPlanning};
@@ -98,6 +99,7 @@ impl Plugin for RobotLabUiPlugin {
                 entity_selection::update_hovered_entities,
                 ribbon::ribbon_functionality,
                 entity_selection::select_entities,
+                entity_selection::handle_selection_requests,
             )
                 .chain(),
         );
@@ -112,10 +114,12 @@ pub struct UiResources<'w, 's> {
     // Robot resources
     plan_q: Query<'w, 's, &'static Plan>,
     robot_q: Query<'w, 's, (&'static Robot, &'static RobotKinematics)>,
+    kinematic_nodes: Query<'w, 's, &'static KinematicNode>,
 
     instructions: Res<'w, AllInstructions>,
 
     selected_entities: ResMut<'w, SelectedEntities>,
+    entity_selection_server: NonSendMut<'w, EntitySelectionServer>,
     scene_window_data: Res<'w, SceneWindowData>,
 }
 
@@ -131,7 +135,7 @@ pub struct UiEvents<'w> {
     plan_events: ResMut<'w, Events<PlanEvent>>,
     import_events: EventWriter<'w, ImportEvent>,
     simulation_events: EventWriter<'w, SimulationEvent>,
-    ik_window_events: ResMut<'w, Events<IkWindowUiEvent>>
+    ik_window_events: ResMut<'w, Events<IkWindowUiEvent>>,
 }
 
 #[derive(Resource)]
