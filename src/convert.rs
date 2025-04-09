@@ -4,7 +4,7 @@ use bevy_rapier3d::geometry::ActiveHooks;
 use bevy_rapier3d::math::{Real, Vect};
 use bevy_rapier3d::na::{ArrayStorage, Matrix3, Vector, Vector3};
 use bevy_rapier3d::parry::math::AngVector;
-use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, Group, RapierContextMut, RapierContextSimulation, RapierQueryPipeline};
+use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CoefficientCombineRule, GenericJoint, Group, RapierContextMut, RapierContextSimulation, RapierQueryPipeline, TypedJoint};
 use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::prelude::{
     ColliderHandle, ColliderSet, ImpulseJointHandle,
@@ -17,6 +17,20 @@ use std::collections::HashMap;
 impl Into<Vect> for W<AngVector<Real>> {
     fn into(self) -> Vect {
         Vect::new(self.x, self.y, self.z)
+    }
+}
+
+impl AsRef<GenericJoint> for W<&TypedJoint> {
+    fn as_ref(&self) -> &GenericJoint {
+        match **self {
+            TypedJoint::FixedJoint(j) => &j.data,
+            TypedJoint::GenericJoint(j) => &j,
+            TypedJoint::PrismaticJoint(j) => &j.data,
+            TypedJoint::RevoluteJoint(j) => &j.data,
+            TypedJoint::RopeJoint(j) => &j.data,
+            TypedJoint::SphericalJoint(j) => &j.data,
+            TypedJoint::SpringJoint(j) => &j.data,
+        }
     }
 }
 

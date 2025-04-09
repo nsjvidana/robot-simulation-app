@@ -2,7 +2,7 @@ use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::math::Real;
 use crate::prelude::*;
 use crate::ui::{RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
-use bevy::prelude::Event;
+use bevy::prelude::{Entity, Event};
 use bevy_egui::egui::{Context, Image, Ui};
 use bevy_egui::egui;
 use derivative::Derivative;
@@ -14,7 +14,8 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use bevy_egui::egui::load::SizedTexture;
-use crate::ui::entity_selection::{SelectionRequest, SelectionResponse};
+use bevy_rapier3d::prelude::GenericJoint;
+use crate::ui::entity_selection::{EntitySelectionResources, SelectionRequest, SelectionResponse};
 
 #[derive(Derivative)]
 #[derivative(Default)]
@@ -32,6 +33,35 @@ pub struct InverseKinematicsWindow {
 
     end_effector_selection_response: Option<Arc<Mutex<SelectionResponse>>>,
     ik_data: Option<IkData>,
+}
+
+impl InverseKinematicsWindow {
+    fn end_effector_selection_filter(clicked_entity: Entity, sel_resources: &EntitySelectionResources) -> bool {
+        let Some(active_robot) = sel_resources.selected_entities.active_robot else {
+            return false;
+        };
+        let is_from_active_robot =
+            sel_resources.robot_part_q.get(clicked_entity)
+                .is_ok_and(|(part, _)| part.0 == active_robot) &&
+                sel_resources.kinematic_nodes.contains(clicked_entity);
+        if !is_from_active_robot {
+            return false;
+        }
+
+        let mut joint = sel_resources.joint_q.get(clicked_entity);
+        while let Ok((imp, mb)) = joint {
+            let (j, parent) =
+                if let Some(imp) = imp { (W(&imp.data), imp.parent) }
+                else if let Some(mb) = mb { (W(&mb.data), mb.parent) }
+                else { return false; };
+            let generic_j: &GenericJoint = j.as_ref();
+            if generic_j.raw.motor_axes.bits() == 0 {
+                return false;
+            }
+            joint = sel_resources.joint_q.get(parent);
+        }
+        true
+    }
 }
 
 impl View for InverseKinematicsWindow {
@@ -63,8 +93,11 @@ impl View for InverseKinematicsWindow {
                 // TODO: add image to end effector btn
                 ui.button("End Effector (Selected)").clicked()
             }
+            else if self.end_effector_selection_response.is_some() {
+                ui.button("End Effector (Selecting)").clicked()
+            }
             else {
-                ui.button("End Effector").clicked()
+                ui.button("Select End Effector").clicked()
             };
 
         if solver_dropdown.response.clicked() || self.solve_clicked {
@@ -104,19 +137,17 @@ impl View for InverseKinematicsWindow {
         };
 
         if window.end_effector_clicked {
-            ik_data.end_effector = None;
-            window.end_effector_selection_response =
-                Some(
-                    SelectionRequest::new(|entity, sel_resources| {
-                        let Some(active_robot) = sel_resources.selected_entities.active_robot else {
-                            return false;
-                        };
-                        sel_resources.robot_part_q.get(entity)
-                            .is_ok_and(|(part, _)| part.0 == active_robot) &&
-                        sel_resources.kinematic_nodes.contains(entity)
-                    })
+            if window.end_effector_selection_response.is_some() {
+                window.end_effector_selection_response.as_ref().unwrap().lock().cancel_response();
+                window.end_effector_selection_response = None;
+            }
+            else {
+                ik_data.end_effector = None;
+                window.end_effector_selection_response = Some(
+                    SelectionRequest::new(Self::end_effector_selection_filter)
                         .send(&mut resources.entity_selection_server)
                 );
+            }
         }
 
         if let Some(resp) = &window.end_effector_selection_response {
