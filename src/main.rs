@@ -4,7 +4,7 @@ use crate::motion_planning::MotionPlanningPlugin;
 use crate::prelude::*;
 use bevy::app::PostUpdate;
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Query, Res, Startup, Time, Update, With};
+use bevy::prelude::{ButtonInput, EventReader, FixedUpdate, IntoSystemConfigs, KeyCode, Local, NonSendMut, Query, Res, Startup, Time, Update, With};
 use bevy::{
     app::App,
     math::Vec3,
@@ -18,7 +18,10 @@ use bevy_rapier3d::{
     prelude::{Collider, RigidBody},
 };
 use std::ops::DerefMut;
+use std::sync::Arc;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use parking_lot::Mutex;
+use crate::ui::entity_selection::{EntitySelectionServer, SelectionRequest, SelectionResponse};
 
 pub mod convert;
 pub mod error;
@@ -78,15 +81,28 @@ pub struct PhysicsData<'w, 's> {
     time: Res<'w, Time>
 }
 
-pub fn update(mut robot_q: Query<&mut Transform, With<Robot>>, keys: Res<ButtonInput<KeyCode>>) {
+#[derive(Default)]
+struct State {
+    resp: Option<Arc<Mutex<SelectionResponse>>>,
+}
+
+pub fn update(
+    mut state: Local<State>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut entity_selection_server: NonSendMut<EntitySelectionServer>
+) {
     if keys.just_pressed(KeyCode::KeyP) {
-        for mut robot_transform in robot_q.iter_mut() {
-            robot_transform.translation.x += 1.;
+        state.resp = Some(SelectionRequest::new(|entity, resources| {
+            resources.joint_q.contains(entity)
+        })
+            .send(&mut entity_selection_server));
+    }
+    if let Some(resp) = state.resp.clone() {
+        if let Some(entity) = resp.lock().get_selection() {
+            println!("{}", entity);
+            state.resp = None;
         }
     }
-    // else {
-    //     rapier_ctx_q.get_single_mut().unwrap().physics_pipeline_active = false;
-    // }
 }
 
 pub fn startup(mut commands: Commands) {

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use crate::prelude::*;
 use crate::ui::motion_planning::MotionPlanning;
-use crate::ui::{GizmosUi, GizmosUiParameters, PointerUsageState, RobotLabUiAssets, SceneWindowData, SelectedEntities, UiEvents, UiGizmoGroup, UiResources, View, WindowUI};
+use crate::ui::{GizmosUi, GizmosUiParameters, RobotLabUiAssets, UiEvents, UiGizmoGroup, UiResources, View, WindowUI};
 use bevy::input::ButtonInput;
 use bevy::prelude::{Commands, EventWriter, Gizmos, GlobalTransform, MouseButton, NonSend, NonSendMut, Or, Query, Res, ResMut, Resource, With};
 use bevy_egui::egui;
@@ -160,6 +160,7 @@ use crate::kinematics::ik::KinematicNode;
 use crate::robot::{RapierRobotHandles, Robot, RobotPart};
 pub(crate) use finish_ribbon_tab;
 use crate::error::ErrorEvent;
+use crate::ui::entity_selection::{PointerUsageState, SceneWindowData, SelectedEntities};
 use crate::ui::general::GeneralTab;
 
 pub fn ribbon_functionality(

@@ -8,7 +8,8 @@ use bevy_rapier3d::rapier::geometry::Ray;
 use crate::math::compute_intersection_pos;
 use crate::prelude::*;
 use crate::prelude::Real as Real;
-use crate::ui::{GizmosUi, GizmosUiParameters, PointerUsageState, RobotLabUiAssets, UiEvents, UiResources, View};
+use crate::ui::{GizmosUi, GizmosUiParameters, RobotLabUiAssets, UiEvents, UiResources, View};
+use crate::ui::entity_selection::PointerUsageState;
 
 #[derive(Resource)]
 pub struct PositionTools {
