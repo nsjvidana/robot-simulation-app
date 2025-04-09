@@ -132,11 +132,8 @@ impl View for InverseKinematicsWindow {
         }
 
         if window.solve_clicked {
-            let Some(ik_data) = &mut window.ik_data else {
-                return Ok(());
-            };
             let Some(end_effector) = ik_data.end_effector.clone() else {
-                return Err(Error::FailedOperation("Inverse Kinematics Failed: End effector not selected!".to_string()));
+                return Err(Error::FailedOperation("Inverse Kinematics Failed: No end effector selected!".to_string()));
             };
             if !end_effector.is_end() {
                 return Err(Error::FailedOperation("Inverse Kinematics Failed: End effector isn't an end!".to_string()));
@@ -151,9 +148,11 @@ impl View for InverseKinematicsWindow {
                     .reference_robot(Arc::new(ik_data.chain.clone()))
                     .finalize()
                     .unwrap();
+            println!("1");
             let solver = window.solvers.remove(&window.selected_solver).unwrap();
             let mut ik_planner = JointPathPlannerWithIk::new(planner, W(solver));
             let compound = ncollide3d::shape::Compound::new(vec![]);
+            println!("2");
             // TODO: handle the openrr-planner errors properly.
             *ik_data.positions.lock() = ik_planner
                 .plan_with_ik(end_effector.joint().name.as_str(), &ik_data.target_pose, &compound)
@@ -163,7 +162,9 @@ impl View for InverseKinematicsWindow {
                     *ik_data.canceled.lock() = true;
                     Error::FailedOperation(format!("Inverse Kinematics failed: {:?}", e))
                 })?;
+            println!("3");
             *ik_data.is_finished.lock() = true;
+            println!("4");
         }
 
         Ok(())

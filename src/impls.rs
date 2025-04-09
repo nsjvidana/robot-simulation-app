@@ -32,6 +32,6 @@ impl InverseKinematicsSolver<Real> for W<Box<dyn InverseKinematicsSolver<Real>>>
     }
 
     fn solve_with_constraints(&self, arm: &SerialChain<Real>, target_pose: &k::Isometry3<Real>, constraints: &Constraints) -> std::result::Result<(), k::Error> {
-        self.solve_with_constraints(arm, target_pose, constraints)
+        (self.0).solve_with_constraints(arm, target_pose, constraints)
     }
 }

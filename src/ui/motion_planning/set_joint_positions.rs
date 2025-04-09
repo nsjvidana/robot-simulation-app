@@ -96,6 +96,10 @@ impl View for SetJointPositionsWindow {
                 *is_finished = false;
                 *canceled = false;
             }
+
+            if *is_finished {
+                println!("{:?}", window.ik_output.lock());
+            }
         }
 
         Ok(())
