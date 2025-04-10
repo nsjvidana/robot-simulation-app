@@ -1,5 +1,6 @@
 mod ik;
 mod set_joint_positions;
+mod wait;
 
 use std::any::Any;
 pub use ik::*;
@@ -15,6 +16,7 @@ use parking_lot::Mutex;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use crate::ui::motion_planning::set_joint_positions::SetJointPositionsWindow;
+use crate::ui::motion_planning::wait::WaitInstructionWindow;
 
 #[derive(Default)]
 pub struct MotionPlanning {
@@ -24,6 +26,7 @@ pub struct MotionPlanning {
     ik_window: InverseKinematicsWindow,
     edit_plan_window: EditPlanWindow,
     set_joint_positions_window: SetJointPositionsWindow,
+    wait_instruction_window: WaitInstructionWindow,
     //RRT?
     //Vehicle controller?
 }
@@ -109,8 +112,8 @@ impl View for MotionPlanning {
 
         EditPlanWindow::functionality(resources, events)?;
         SetJointPositionsWindow::functionality(resources, events)?;
+        WaitInstructionWindow::functionality(resources, events)?;
         InverseKinematicsWindow::functionality(resources, events)?;
-        // TODO: InverseKinematicsWindow::functionality(resources, events)?;
 
         Ok(())
     }
@@ -121,6 +124,7 @@ impl WindowUI for MotionPlanning {
         self.ik_window.window_ui(egui_ctx, ui_assets);
         self.edit_plan_window.window_ui(egui_ctx, ui_assets);
         self.set_joint_positions_window.window_ui(egui_ctx, ui_assets);
+        self.wait_instruction_window.window_ui(egui_ctx, ui_assets);
     }
 }
 
