@@ -122,9 +122,9 @@ impl View for InverseKinematicsWindow {
         // Flag the IK operation as "canceled" if the window was closed
         if window.was_closed {
             if let Some(ik_data) = &window.ik_data {
-                *ik_data.is_finished.lock() = false;
                 *ik_data.canceled.lock() = true;
             }
+            window.ik_data = None;
         }
         // Opening the IK window when it is requested.
         for event in events.ik_window_events.drain() {
@@ -150,8 +150,9 @@ impl View for InverseKinematicsWindow {
             }
         }
 
-        if let Some(resp) = &window.end_effector_selection_response {
-            if let Some(end_entity) = resp.lock().get_selection() {
+        if let Some(resp) = window.end_effector_selection_response.to_owned() {
+            let resp = resp.lock();
+            if let Some(end_entity) = resp.get_selection() {
                 ik_data.end_effector = Some(
                     resources.kinematic_nodes
                         .get(end_entity)
@@ -159,6 +160,7 @@ impl View for InverseKinematicsWindow {
                         .deref()
                         .clone()
                 );
+                window.end_effector_selection_response = None;
             }
         }
 
@@ -180,15 +182,17 @@ impl View for InverseKinematicsWindow {
             let mut ik_planner = JointPathPlannerWithIk::new(planner, W(solver));
             let compound = ncollide3d::shape::Compound::new(vec![]);
             // TODO: handle the openrr-planner errors properly.
-            *ik_data.positions.lock() = ik_planner
+            let positions = ik_planner
                 .plan_with_ik(end_effector.joint().name.as_str(), &ik_data.target_pose, &compound)
                 .map_err(|e| {
                     // Cancel the ik operation if a planning error occurred.
-                    *ik_data.is_finished.lock() = false;
                     *ik_data.canceled.lock() = true;
                     Error::FailedOperation(format!("Inverse Kinematics failed: {:?}", e))
                 })?;
-            *ik_data.is_finished.lock() = true;
+            *ik_data.output.lock() = Some(IkOutput {
+                positions,
+                serial_chain: k::SerialChain::from_end(&end_effector),
+            });
         }
 
         Ok(())
@@ -208,6 +212,7 @@ impl WindowUI for InverseKinematicsWindow {
     }
 }
 
+// TODO: impl IK preview
 impl GizmosUi for InverseKinematicsWindow {
     fn gizmos_ui(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters,) {
         let window = &mut ui_resources.motion_planning_tab.ik_window;
@@ -227,6 +232,13 @@ impl GizmosUi for InverseKinematicsWindow {
                 Color::WHITE
             );
         }
+
+        let t = ik_data.target_pose.translation;
+        gizmos_resources.gizmos.sphere(
+            Isometry3d::from_translation(Vec3::new(t.x, t.y, t.z)),
+            0.1,
+            Color::linear_rgba(1., 1., 0., 1.),
+        );
     }
 
     fn gizmos_functionality(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters, events: &mut UiEvents) -> Result<()> {
@@ -234,11 +246,8 @@ impl GizmosUi for InverseKinematicsWindow {
     }
 }
 
-// TODO: impl IK preview
-
 pub struct IkData {
     pub chain: k::Chain<Real>,
-    pub is_finished: Arc<Mutex<bool>>,
     pub canceled: Arc<Mutex<bool>>,
     pub urdf: urdf_rs::Robot,
     pub urdf_path: PathBuf,
@@ -247,21 +256,20 @@ pub struct IkData {
     pub target_pose: Isometry3<Real>,
     /// Resulting positions from solver. Stored for returning solver result &
     /// previewing IK result.
-    pub positions: Arc<Mutex<Vec<Vec<Real>>>>
+    pub output: Arc<Mutex<Option<IkOutput>>>
 }
 
 impl From<IkWindowUiEvent> for IkData {
     fn from(event: IkWindowUiEvent) -> Self {
         Self {
             chain: event.chain,
-            is_finished: event.is_finished,
             canceled: event.canceled,
             urdf: event.urdf,
             urdf_path: event.urdf_path,
             end_effector: None,
 
             target_pose: event.target_pose,
-            positions: Arc::new(Mutex::new(vec![])),
+            output: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -278,10 +286,14 @@ pub struct IkWindowUiEvent {
     pub chain: k::Chain<Real>,
     /// The output of the IK solver. When not using collision avoidance planning, read
     /// the first element of this vec only.
-    pub solver_output: Arc<Mutex<Vec<Vec<Real>>>>,
-    pub is_finished: Arc<Mutex<bool>>,
+    pub solver_output: Arc<Mutex<Option<IkOutput>>>,
     pub canceled: Arc<Mutex<bool>>,
     pub urdf: urdf_rs::Robot,
     pub urdf_path: PathBuf,
     pub target_pose: Isometry3<Real>,
+}
+
+pub struct IkOutput {
+    pub serial_chain: k::SerialChain<Real>,
+    pub positions: Vec<Vec<Real>>,
 }

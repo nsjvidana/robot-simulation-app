@@ -7,7 +7,7 @@ use bevy_egui::egui::{Context, Ui, Widget};
 use parking_lot::Mutex;
 use crate::math::Real;
 use crate::motion_planning::set_joint_positions::SetJointPositionsInstruction;
-use crate::ui::motion_planning::IkWindowUiEvent;
+use crate::ui::motion_planning::{IkOutput, IkWindowUiEvent};
 
 #[derive(Default)]
 pub struct SetJointPositionsWindow {
@@ -15,8 +15,8 @@ pub struct SetJointPositionsWindow {
     instruction: Option<SetJointPositionsInstruction>,
     inverse_kinematics_clicked: bool,
     // Inverse kinematics data
-    ik_output: Arc<Mutex<Vec<Vec<Real>>>>,
-    pub is_finished: Arc<Mutex<bool>>,
+    ik_output: Arc<Mutex<Option<IkOutput>>>,
+    /// Whether the IK solver was canceled (e.g. if the IK window was closed)
     pub canceled: Arc<Mutex<bool>>,
     waiting_for_ik: bool,
 }
@@ -73,6 +73,9 @@ impl View for SetJointPositionsWindow {
             }
         }
 
+        let Some(instruction) = &mut window.instruction else {
+            return Ok(());
+        };
         let Some(robot_entity) = resources.selected_entities.active_robot else {
             return Ok(());
         };
@@ -83,7 +86,6 @@ impl View for SetJointPositionsWindow {
             events.ik_window_events.send(IkWindowUiEvent {
                 chain: owned_chain,
                 solver_output: window.ik_output.clone(),
-                is_finished: window.is_finished.clone(),
                 canceled: window.canceled.clone(),
                 urdf: robot.urdf.clone(),
                 urdf_path: robot.robot_file_path.clone(),
@@ -92,15 +94,20 @@ impl View for SetJointPositionsWindow {
             window.waiting_for_ik = true;
         }
         else if window.waiting_for_ik {
-            let (mut is_finished, mut canceled) = (window.is_finished.lock(), window.canceled.lock());
-            if *is_finished || *canceled {
+            let (ik_output, mut canceled) = (&*window.ik_output.lock(), window.canceled.lock());
+            if ik_output.is_some() || *canceled {
                 window.waiting_for_ik = false;
-                *is_finished = false;
                 *canceled = false;
             }
 
-            if *is_finished {
-                println!("{:?}", window.ik_output.lock());
+            if let Some(ik_output) = ik_output {
+                let entities = ik_output.serial_chain.iter()
+                    .map(|node| resources.kinematic_nodes
+                        .iter()
+                        .find(|node_cmp| node_cmp.0 == *node)
+                    )
+                    .collect::<Vec<_>>();
+                println!("{}, {}", entities.len(), ik_output.positions.first().unwrap().len());
             }
         }
 

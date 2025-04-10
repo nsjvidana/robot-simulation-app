@@ -15,6 +15,7 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 use parking_lot::Mutex;
 use crate::prelude::ik::KinematicNode;
+use crate::robot::RobotKinematics;
 
 #[derive(Resource, Default)]
 pub struct SceneWindowData {
@@ -73,6 +74,7 @@ pub struct EntitySelectionResources<'w, 's> {
         )>,
     >,
     pub robot_q: Query<'w, 's, &'static Robot>,
+    pub robot_kinematics: Query<'w, 's, &'static RobotKinematics>,
     pub robot_part_q: Query<'w, 's, (&'static RobotPart, Option<&'static Parent>)>,
     pub kinematic_nodes: Query<'w, 's, &'static KinematicNode>,
     pub selected_entities: ResMut<'w, SelectedEntities>,
