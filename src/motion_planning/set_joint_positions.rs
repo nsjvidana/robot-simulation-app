@@ -88,8 +88,11 @@ impl Instruction for SetJointPositionsInstruction {
             for motor_idx in 0..SPATIAL_DIM {
                 if (joint.motor_axes.bits() & 1 << motor_idx) != 0 {
                     let target_motor_pos = positions[motor_idx];
-                    joint.motors[motor_idx].target_pos = target_motor_pos;
                     let curr_pos = curr_joint_positions[motor_idx];
+
+                    let speed = joint.motors[motor_idx].target_vel.abs();
+                    joint.motors[motor_idx].target_pos = target_motor_pos;
+                    joint.motors[motor_idx].target_vel = speed * (target_motor_pos - curr_pos).signum();
                     if relative_eq!(curr_pos, target_motor_pos, epsilon = self.eps) {
                         finished_joints += 1;
                     }

@@ -116,7 +116,7 @@ pub struct UiResources<'w, 's> {
     // Robot resources
     plan_q: Query<'w, 's, &'static Plan>,
     robot_q: Query<'w, 's, (&'static Robot, &'static RobotKinematics)>,
-    kinematic_nodes: Query<'w, 's, &'static KinematicNode>,
+    kinematic_nodes: Query<'w, 's, (Entity, &'static KinematicNode)>,
 
     instructions: Res<'w, AllInstructions>,
 

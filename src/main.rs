@@ -109,7 +109,7 @@ pub fn update(
 pub fn startup(mut commands: Commands) {
     // Camera
     commands.spawn((
-        Transform::from_xyz(-10., 10., 10.).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(-2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Y),
         Camera3d::default(),
         FlyCam,
     ));

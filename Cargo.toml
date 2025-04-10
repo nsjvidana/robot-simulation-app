@@ -27,10 +27,17 @@ derivative = "2.2.0"
 ahash = "0.8.11"
 downcast-rs = "2.0.1"
 egui_extras = "0.31.1"
+bevy-inspector-egui = "0.30.0"
 
 [patch.crates-io]
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" } # URDF transmissions support
 openrr-planner = { git = "https://github.com/openrr/openrr.git", rev = "bb3e176" } # Force the crate to use urdf-rs v0.9
+
+[profile.dev.package."rapier3d"]
+opt-level = 3
+
+[profile.dev.package."bevy_rapier3d"]
+opt-level = 3
 
 [profile.dev]
 opt-level = 1

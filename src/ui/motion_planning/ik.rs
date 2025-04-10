@@ -6,15 +6,15 @@ use bevy::prelude::{Color, Entity, Event, Isometry3d, Quat, Vec3};
 use bevy_egui::egui::{Context, Image, Ui};
 use bevy_egui::egui;
 use derivative::Derivative;
-use k::Isometry3;
+use k::{Constraints, InverseKinematicsSolver, Isometry3, JointType, SerialChain};
 use openrr_planner::{JointPathPlannerBuilder, JointPathPlannerWithIk};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
-use bevy_egui::egui::load::SizedTexture;
 use bevy_rapier3d::prelude::GenericJoint;
+use bevy_rapier3d::rapier::prelude::SPATIAL_DIM;
 use crate::ui::entity_selection::{EntitySelectionResources, SelectionRequest, SelectionResponse};
 
 #[derive(Derivative)]
@@ -27,7 +27,7 @@ pub struct InverseKinematicsWindow {
     /// Selected IK solver for joint chain
     selected_solver: IKSolverType,
     #[derivative(Default(value="HashMap::with_capacity(2)"))]
-    solvers: HashMap<IKSolverType, Box<dyn k::InverseKinematicsSolver<Real>>>,
+    solvers: HashMap<IKSolverType, IkSolver>,
     solve_clicked: bool,
     end_effector_clicked: bool,
 
@@ -100,20 +100,38 @@ impl View for InverseKinematicsWindow {
                 ui.button("Select End Effector").clicked()
             };
 
-        if solver_dropdown.response.clicked() || self.solve_clicked {
-            match self.selected_solver {
-                IKSolverType::Jacobian => {
-                    let _ = self.solvers
-                        .entry(IKSolverType::Jacobian)
-                        .or_insert(Box::new(k::JacobianIkSolver::default()) as _);
-                }
-                IKSolverType::Cyclic => {
-                    let _ = self.solvers
-                        .entry(IKSolverType::Cyclic)
-                        .or_insert(Box::new(ForwardDescentCyclic::default()) as _);
-                }
+        // Draw UI that lets the user edit the solver parameters
+        macro_rules! drag_value {
+            ($label:expr, $field:expr) => {
+                ui.horizontal(|ui| {
+                    ui.label($label);
+                    ui.add(
+                        egui::DragValue::new(&mut $field)
+                            .min_decimals(3)
+                    );
+                });
+            };
+        }
+        match self.selected_solver {
+            IKSolverType::Jacobian => {
+                let solver = self.solvers
+                    .entry(IKSolverType::Jacobian)
+                    .or_insert(IkSolver::Jacobian(k::JacobianIkSolver::default()));
+                let IkSolver::Jacobian(solver) = solver else { unreachable!() };
+
+                ui.label("Jacobian Solver Parameters");
+                drag_value!("Max Iterations: ", solver.num_max_try);
+                drag_value!("Max Distance Error: ", solver.allowable_target_distance);
+                drag_value!("Max Angle Error (radians): ", solver.allowable_target_angle);
+                drag_value!("Jacobian Multiplier ", solver.jacobian_multiplier);
+            }
+            IKSolverType::Cyclic => {
+                let _solver = self.solvers
+                    .entry(IKSolverType::Cyclic)
+                    .or_insert(IkSolver::Cyclic(ForwardDescentCyclic::default()));
             }
         }
+
     }
 
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> Result<()> {
@@ -156,6 +174,7 @@ impl View for InverseKinematicsWindow {
                 ik_data.end_effector = Some(
                     resources.kinematic_nodes
                         .get(end_entity)
+                        .map(|v| v.1)
                         .unwrap()
                         .deref()
                         .clone()
@@ -168,6 +187,7 @@ impl View for InverseKinematicsWindow {
             let Some(end_effector) = ik_data.end_effector.clone() else {
                 return Err(Error::FailedOperation("Inverse Kinematics Failed: No end effector selected!".to_string()));
             };
+            ik_data.chain.update_transforms();
 
             let planner =
                 JointPathPlannerBuilder::from_urdf_robot_with_base_dir(
@@ -179,16 +199,32 @@ impl View for InverseKinematicsWindow {
                     .finalize()
                     .unwrap();
             let solver = window.solvers.remove(&window.selected_solver).unwrap();
-            let mut ik_planner = JointPathPlannerWithIk::new(planner, W(solver));
+            let mut ik_planner = JointPathPlannerWithIk::new(planner, solver);
             let compound = ncollide3d::shape::Compound::new(vec![]);
             // TODO: handle the openrr-planner errors properly.
             let positions = ik_planner
                 .plan_with_ik(end_effector.joint().name.as_str(), &ik_data.target_pose, &compound)
                 .map_err(|e| {
-                    // Cancel the ik operation if a planning error occurred.
-                    *ik_data.canceled.lock() = true;
+                    // // Cancel the ik operation if a planning error occurred.
+                    // *ik_data.canceled.lock() = true;
                     Error::FailedOperation(format!("Inverse Kinematics failed: {:?}", e))
-                })?;
+                });
+            window.solvers.insert(window.selected_solver, ik_planner.ik_solver); // Add solver back to solver list
+            let positions = positions?;
+            let serial_chain = k::SerialChain::from_end(&end_effector);
+            let positions = positions.iter()
+                .map(|v| v.iter()
+                    .zip(serial_chain.iter().filter(|v| v.joint().is_movable()))
+                    .map(|(pos, node)| {
+                        match node.joint().joint_type {
+                            JointType::Fixed => { unreachable!() }
+                            JointType::Rotational { .. } => { [0., 0., 0., *pos, 0., 0.] }
+                            JointType::Linear { .. } => { [*pos, 0., 0., 0., 0., 0.] }
+                        }
+                    })
+                    .collect()
+                )
+                .collect::<Vec<_>>();
             *ik_data.output.lock() = Some(IkOutput {
                 positions,
                 serial_chain: k::SerialChain::from_end(&end_effector),
@@ -219,19 +255,30 @@ impl GizmosUi for InverseKinematicsWindow {
         let Some(ik_data) = &mut window.ik_data else {
             return;
         };
+        let Some(end_effector) = &ik_data.end_effector else {
+            return;
+        };
 
-        for trans in ik_data.chain.update_transforms().into_iter() {
-            let t = trans.translation;
-            let r = trans.rotation;
-            gizmos_resources.gizmos.sphere(
-                Isometry3d {
-                    translation: Vec3::new(t.x, t.y, t.z).into(),
-                    rotation: Quat::from_array([r.i, r.k, r.j, r.w])
-                },
-                0.1,
+        let chain = k::SerialChain::from_end(end_effector);
+        let transforms = chain.update_transforms();
+        let mut prev = *transforms.first().unwrap();
+        for transform in transforms.iter().skip(1) {
+            let t_prev = prev.translation;
+            let t_curr = transform.translation;
+            gizmos_resources.gizmos.line(
+                Vec3::new(t_prev.x, t_prev.y, t_prev.z),
+                Vec3::new(t_curr.x, t_curr.y, t_curr.z),
                 Color::WHITE
             );
+            prev = *transform;
         }
+
+        let t = chain.origin().translation;
+        gizmos_resources.gizmos.sphere(
+            Isometry3d::from_translation(Vec3::new(t.x, t.y, t.z)),
+            0.1,
+            Color::WHITE,
+        );
 
         let t = ik_data.target_pose.translation;
         gizmos_resources.gizmos.sphere(
@@ -269,7 +316,7 @@ impl From<IkWindowUiEvent> for IkData {
             end_effector: None,
 
             target_pose: event.target_pose,
-            output: Arc::new(Mutex::new(None)),
+            output: event.solver_output,
         }
     }
 }
@@ -279,6 +326,27 @@ pub enum IKSolverType {
     #[default]
     Jacobian = 0,
     Cyclic,
+}
+
+pub enum IkSolver {
+    Jacobian(k::JacobianIkSolver<Real>),
+    Cyclic(ForwardDescentCyclic),
+}
+
+impl InverseKinematicsSolver<Real> for IkSolver {
+    fn solve(&self, arm: &SerialChain<Real>, target_pose: &Isometry3<Real>) -> std::result::Result<(), k::Error> {
+        match self {
+            IkSolver::Jacobian(s) => s.solve(arm, target_pose),
+            IkSolver::Cyclic(s) => s.solve(arm, target_pose),
+        }
+    }
+
+    fn solve_with_constraints(&self, arm: &SerialChain<Real>, target_pose: &Isometry3<Real>, constraints: &Constraints) -> std::result::Result<(), k::Error> {
+        match self {
+            IkSolver::Jacobian(s) => s.solve_with_constraints(arm, target_pose, constraints),
+            IkSolver::Cyclic(s) => s.solve_with_constraints(arm, target_pose, constraints),
+        }
+    }
 }
 
 #[derive(Event)]
@@ -295,5 +363,5 @@ pub struct IkWindowUiEvent {
 
 pub struct IkOutput {
     pub serial_chain: k::SerialChain<Real>,
-    pub positions: Vec<Vec<Real>>,
+    pub positions: Vec<Vec<[Real; SPATIAL_DIM]>>,
 }

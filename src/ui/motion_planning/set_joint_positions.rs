@@ -12,18 +12,21 @@ use crate::ui::motion_planning::{IkOutput, IkWindowUiEvent};
 #[derive(Default)]
 pub struct SetJointPositionsWindow {
     open: bool,
-    instruction: Option<SetJointPositionsInstruction>,
-    inverse_kinematics_clicked: bool,
+    instruction_copy: Option<SetJointPositionsInstruction>,
+    instruction_object: Option<InstructionObject>,
     // Inverse kinematics data
     ik_output: Arc<Mutex<Option<IkOutput>>>,
     /// Whether the IK solver was canceled (e.g. if the IK window was closed)
     pub canceled: Arc<Mutex<bool>>,
     waiting_for_ik: bool,
+
+    inverse_kinematics_clicked: bool,
+    save_clicked: bool,
 }
 
 impl View for SetJointPositionsWindow {
     fn ui(&mut self, ui: &mut Ui, ui_assets: &RobotLabUiAssets) {
-        let Some(instruction) = self.instruction.clone() else {
+        let Some(instruction) = self.instruction_copy.clone() else {
             self.open = false;
             return;
         };
@@ -56,6 +59,7 @@ impl View for SetJointPositionsWindow {
             });
         // ui.withla
         self.inverse_kinematics_clicked = ui.button("Inverse Kinematics").clicked();
+        self.save_clicked = ui.button("Save").clicked();
     }
 
     fn functionality(resources: &mut UiResources, events: &mut UiEvents) -> crate::prelude::Result<()> {
@@ -68,18 +72,29 @@ impl View for SetJointPositionsWindow {
                     .cloned()
                 {
                     window.open = true;
-                    window.instruction = Some(instruction_copy);
+                    window.instruction_copy = Some(instruction_copy);
+                    window.instruction_object = Some(instruction.clone());
                 }
             }
         }
 
-        let Some(instruction) = &mut window.instruction else {
+        let Some(instruction) = &mut window.instruction_copy else {
             return Ok(());
         };
         let Some(robot_entity) = resources.selected_entities.active_robot else {
             return Ok(());
         };
         let (robot, kinematics) = resources.robot_q.get(robot_entity).unwrap();
+
+        if window.save_clicked {
+            window.save_clicked = false;
+            let instruction_object = window.instruction_object.take().unwrap();
+            *instruction_object.lock() = Box::new(window.instruction_copy.take().unwrap());
+            window.open = false;
+            window.waiting_for_ik = false;
+            *window.canceled.lock() = false;
+            return Ok(());
+        }
 
         if !window.waiting_for_ik && window.inverse_kinematics_clicked {
             let owned_chain = k::Chain::from_nodes(kinematics.chain.iter().cloned().collect());
@@ -89,25 +104,31 @@ impl View for SetJointPositionsWindow {
                 canceled: window.canceled.clone(),
                 urdf: robot.urdf.clone(),
                 urdf_path: robot.robot_file_path.clone(),
-                target_pose: kinematics.chain.origin()
+                target_pose: k::Isometry3::identity()
             });
             window.waiting_for_ik = true;
         }
-        else if window.waiting_for_ik {
+        if window.waiting_for_ik {
             let (ik_output, mut canceled) = (&*window.ik_output.lock(), window.canceled.lock());
             if ik_output.is_some() || *canceled {
                 window.waiting_for_ik = false;
-                *canceled = false;
+                *canceled = false; // Reset canceled state
             }
 
             if let Some(ik_output) = ik_output {
                 let entities = ik_output.serial_chain.iter()
                     .map(|node| resources.kinematic_nodes
                         .iter()
-                        .find(|node_cmp| node_cmp.0 == *node)
+                        .find(|(_, node_cmp)| node_cmp.0 == *node)
                     )
+                    .filter(|v| v.is_some())
+                    .map(|v| v.unwrap().0)
                     .collect::<Vec<_>>();
-                println!("{}, {}", entities.len(), ik_output.positions.first().unwrap().len());
+                instruction.joints_and_positions = ik_output.positions.last().unwrap()
+                    .iter()
+                    .zip(entities)
+                    .map(|v| (v.1, *v.0))
+                    .collect();
             }
         }
 
