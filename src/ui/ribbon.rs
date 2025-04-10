@@ -113,10 +113,10 @@ pub fn ribbon_ui(
     // Gizmos UI
     match ribbon.tab {
         RibbonTab::General => {
-            GeneralTab::gizmos_ui(&mut ui_resources, &mut gizmos_resources)
+            GeneralTab::gizmos_ui(&mut ui_resources, &mut gizmos_resources);
         }
         RibbonTab::MotionPlanning => {
-
+            MotionPlanning::gizmos_ui(&mut ui_resources, &mut gizmos_resources);
         }
         RibbonTab::Fluids => {
 
@@ -197,7 +197,7 @@ pub fn ribbon_functionality(
         RibbonTab::General => {
             GeneralTab::gizmos_functionality(&mut ui_resources, &mut gizmos_resources, &mut ui_events)
         }
-        RibbonTab::MotionPlanning => {Ok(())}
+        RibbonTab::MotionPlanning => {MotionPlanning::gizmos_functionality(&mut ui_resources, &mut gizmos_resources, &mut ui_events)}
         RibbonTab::Fluids => {Ok(())}
     };
     if let Err(error) = result {

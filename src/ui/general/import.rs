@@ -1,4 +1,4 @@
-use crate::general::ImportEvent;
+use crate::general::{ImportEvent, OtherImportOptions};
 use crate::prelude::*;
 use crate::ui::{RobotLabUiAssets, UiEvents, UiResources, View, WindowUI, TOOLTIP_LAYER};
 use bevy::prelude::{default, Resource};
@@ -32,6 +32,7 @@ pub struct ImportWindow {
     pub import_clicked: bool,
     pub mb_loader_options: UrdfMultibodyOptions,
     pub urdf_loader_options: UrdfLoaderOptions,
+    pub other_options: OtherImportOptions,
     pub import_joint_type: ImportJointType,
     pub import_file_path: String,
     pub mesh_dir: String,
@@ -55,6 +56,7 @@ impl Default for ImportWindow {
                 shift: Isometry3::rotation(Vector3::x() * std::f32::consts::FRAC_PI_2),
                 ..default()
             },
+            other_options: default(),
             import_joint_type: default(),
             import_file_path: default(),
             mesh_dir: default(),
@@ -113,10 +115,15 @@ impl View for ImportWindow {
         self.import_clicked = ui.button("Import URDF").clicked();
 
         // "Make roots fixed" checkbox
-        let _checkbox = ui.checkbox(
+        ui.checkbox(
             &mut self.urdf_loader_options.make_roots_fixed,
             "Make roots fixed",
         );
+        ui.checkbox(
+            &mut self.other_options.all_joints_have_motors,
+            "All joints have motors"
+        );
+
 
         // Robot joint type
         ComboBox::from_label("Robot joint type")
@@ -152,6 +159,7 @@ impl View for ImportWindow {
             urdf_loader_options: window.urdf_loader_options.clone(),
             import_joint_type: window.import_joint_type,
             mb_loader_options: window.mb_loader_options.clone(),
+            other_options: window.other_options.clone(),
             file_path,
             mesh_dir,
         });

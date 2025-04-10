@@ -6,7 +6,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::hierarchy::Parent;
 use bevy::input::ButtonInput;
 use bevy::math::Ray3d;
-use bevy::prelude::{Camera, Entity, Gizmos, GlobalTransform, KeyCode, MouseButton, NonSendMut, Or, Query, Res, ResMut, Resource, Single, Window, With};
+use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 use bevy_rapier3d::dynamics::{ImpulseJoint, MultibodyJoint, RapierImpulseJointHandle, RapierMultibodyJointHandle};
 use bevy_rapier3d::pipeline::QueryFilter;
@@ -22,7 +22,8 @@ pub struct SceneWindowData {
     pub camera_transform: GlobalTransform,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Reflect, Default)]
+#[reflect(Resource, Default)]
 pub struct SelectedEntities {
     /// The entities that were clicked this frame.
     ///
@@ -78,7 +79,7 @@ pub struct EntitySelectionResources<'w, 's> {
 }
 
 /// An enum that tells how the pointer using the Positioning tools
-#[derive(PartialEq, Default, Debug)]
+#[derive(Reflect, PartialEq, Default, Debug)]
 pub enum PointerUsageState {
     UsingTool,
     UiUsingPointer,
@@ -86,7 +87,7 @@ pub enum PointerUsageState {
     NotUsed,
 }
 
-#[derive(Debug, Default)]
+#[derive(Reflect, Debug, Default)]
 pub enum EntitySelectionMode {
     /// Only one robot can be selected at a time.
     #[default]

@@ -5,6 +5,7 @@ use bevy::core::Name;
 use bevy::ecs::schedule::{InternedScheduleLabel, ScheduleLabel};
 use bevy::prelude::{Commands, Entity, Event, EventReader, EventWriter, Events, FixedUpdate, IntoSystem, IntoSystemConfigs, Local, Plugin, PostUpdate, Query, ResMut, Resource, Transform, With};
 use bevy_rapier3d::prelude::*;
+use derivative::Derivative;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use crate::error::{error_handling_system, Error, ErrorEvent};
 use crate::prelude::*;
@@ -57,9 +58,17 @@ pub struct ImportEvent {
     pub urdf_loader_options: UrdfLoaderOptions,
     pub import_joint_type: ImportJointType,
     pub mb_loader_options: UrdfMultibodyOptions,
+    pub other_options: OtherImportOptions,
     
     pub file_path: PathBuf,
     pub mesh_dir: PathBuf,
+}
+
+#[derive(Derivative, Clone)]
+#[derivative(Default)]
+pub struct OtherImportOptions {
+    #[derivative(Default(value = "true"))]
+    pub all_joints_have_motors: bool,
 }
 
 #[derive(Event)]
@@ -94,7 +103,8 @@ pub fn import_robots(
         }
         let mesh_dir =
             if mesh_dir.exists() { Some(mesh_dir) } else { None };
-        let robot_cmp = Robot::new(robot_urdf, import.urdf_loader_options, path.clone(), mesh_dir);
+        let mut robot_cmp = Robot::new(robot_urdf, import.urdf_loader_options, path.clone(), mesh_dir);
+            robot_cmp.other_import_options = import.other_options;
         commands.spawn((
             match import.import_joint_type {
                 ImportJointType::Impulse => robot_cmp.with_impulse_joints(),

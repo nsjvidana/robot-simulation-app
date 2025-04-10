@@ -1,8 +1,8 @@
 use crate::kinematics::ik::ForwardDescentCyclic;
 use crate::math::Real;
 use crate::prelude::*;
-use crate::ui::{RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
-use bevy::prelude::{Entity, Event};
+use crate::ui::{GizmosUi, GizmosUiParameters, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
+use bevy::prelude::{Color, Entity, Event, Isometry3d, Quat, Vec3};
 use bevy_egui::egui::{Context, Image, Ui};
 use bevy_egui::egui;
 use derivative::Derivative;
@@ -55,7 +55,7 @@ impl InverseKinematicsWindow {
                 else if let Some(mb) = mb { (W(&mb.data), mb.parent) }
                 else { return false; };
             let generic_j: &GenericJoint = j.as_ref();
-            if generic_j.raw.motor_axes.bits() == 0 {
+            if generic_j.raw.motor_axes.bits() == 0 && generic_j.raw.as_fixed().is_none(){
                 return false;
             }
             joint = sel_resources.joint_q.get(parent);
@@ -166,9 +166,6 @@ impl View for InverseKinematicsWindow {
             let Some(end_effector) = ik_data.end_effector.clone() else {
                 return Err(Error::FailedOperation("Inverse Kinematics Failed: No end effector selected!".to_string()));
             };
-            if !end_effector.is_end() {
-                return Err(Error::FailedOperation("Inverse Kinematics Failed: End effector isn't an end!".to_string()));
-            }
 
             let planner =
                 JointPathPlannerBuilder::from_urdf_robot_with_base_dir(
@@ -179,11 +176,9 @@ impl View for InverseKinematicsWindow {
                     .reference_robot(Arc::new(ik_data.chain.clone()))
                     .finalize()
                     .unwrap();
-            println!("1");
             let solver = window.solvers.remove(&window.selected_solver).unwrap();
             let mut ik_planner = JointPathPlannerWithIk::new(planner, W(solver));
             let compound = ncollide3d::shape::Compound::new(vec![]);
-            println!("2");
             // TODO: handle the openrr-planner errors properly.
             *ik_data.positions.lock() = ik_planner
                 .plan_with_ik(end_effector.joint().name.as_str(), &ik_data.target_pose, &compound)
@@ -193,9 +188,7 @@ impl View for InverseKinematicsWindow {
                     *ik_data.canceled.lock() = true;
                     Error::FailedOperation(format!("Inverse Kinematics failed: {:?}", e))
                 })?;
-            println!("3");
             *ik_data.is_finished.lock() = true;
-            println!("4");
         }
 
         Ok(())
@@ -212,6 +205,32 @@ impl WindowUI for InverseKinematicsWindow {
             });
         self.was_closed = open != self.open && !open;
         self.open = open;
+    }
+}
+
+impl GizmosUi for InverseKinematicsWindow {
+    fn gizmos_ui(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters,) {
+        let window = &mut ui_resources.motion_planning_tab.ik_window;
+        let Some(ik_data) = &mut window.ik_data else {
+            return;
+        };
+
+        for trans in ik_data.chain.update_transforms().into_iter() {
+            let t = trans.translation;
+            let r = trans.rotation;
+            gizmos_resources.gizmos.sphere(
+                Isometry3d {
+                    translation: Vec3::new(t.x, t.y, t.z).into(),
+                    rotation: Quat::from_array([r.i, r.k, r.j, r.w])
+                },
+                0.1,
+                Color::WHITE
+            );
+        }
+    }
+
+    fn gizmos_functionality(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters, events: &mut UiEvents) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -241,7 +260,7 @@ impl From<IkWindowUiEvent> for IkData {
             urdf_path: event.urdf_path,
             end_effector: None,
 
-            target_pose: Isometry3::identity(),
+            target_pose: event.target_pose,
             positions: Arc::new(Mutex::new(vec![])),
         }
     }
@@ -264,4 +283,5 @@ pub struct IkWindowUiEvent {
     pub canceled: Arc<Mutex<bool>>,
     pub urdf: urdf_rs::Robot,
     pub urdf_path: PathBuf,
+    pub target_pose: Isometry3<Real>,
 }

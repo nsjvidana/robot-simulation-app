@@ -9,6 +9,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use bevy_rapier3d::prelude::systems::*;
 use crate::error::error_handling_system;
+use crate::general::OtherImportOptions;
 use crate::math::Real;
 
 pub mod systems;
@@ -52,6 +53,7 @@ pub struct Robot {
     pub robot_joint_type: RobotJointType,
     pub robot_file_path: PathBuf,
     pub urdf_loader_options: UrdfLoaderOptions,
+    pub other_import_options: OtherImportOptions,
 }
 
 impl Robot {
@@ -66,6 +68,7 @@ impl Robot {
             mesh_dir,
             robot_joint_type: RobotJointType::ImpulseJoints,
             robot_file_path: path,
+            other_import_options: OtherImportOptions::default(),
             urdf_loader_options,
         }
     }

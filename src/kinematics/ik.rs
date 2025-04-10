@@ -34,7 +34,7 @@ macro_rules! cyclic_impl {
                 Self {
                     allowable_target_distance: 0.1,
                     allowable_target_angle: 0.1,
-                    max_iterations: 1,
+                    max_iterations: 10,
                     per_joint_dampening: 0.,
                 }
             }
@@ -224,10 +224,10 @@ impl InverseKinematicsSolver<Real> for ForwardDescentCyclic {
     }
     fn solve_with_constraints(
         &self,
-        _arm: &SerialChain<Real>,
-        _target_pose: &Isometry3<Real>,
+        arm: &SerialChain<Real>,
+        target_pose: &Isometry3<Real>,
         _constraints: &Constraints,
     ) -> Result<(), Error> {
-        todo!()
+        self.solve(arm, target_pose)
     }
 }

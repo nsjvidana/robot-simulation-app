@@ -6,7 +6,7 @@ pub use ik::*;
 
 use crate::motion_planning::{Instruction, InstructionObject, PlanEvent};
 use crate::prelude::*;
-use crate::ui::{ribbon::finish_ribbon_tab, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
+use crate::ui::{ribbon::finish_ribbon_tab, GizmosUi, GizmosUiParameters, RobotLabUiAssets, UiEvents, UiResources, View, WindowUI};
 use bevy::prelude::{default, Entity, Resource};
 use bevy_egui::egui;
 use bevy_egui::egui::{Color32, Context, Frame, Id, Response, Ui};
@@ -121,6 +121,17 @@ impl WindowUI for MotionPlanning {
         self.ik_window.window_ui(egui_ctx, ui_assets);
         self.edit_plan_window.window_ui(egui_ctx, ui_assets);
         self.set_joint_positions_window.window_ui(egui_ctx, ui_assets);
+    }
+}
+
+impl GizmosUi for MotionPlanning {
+    fn gizmos_ui(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters) {
+        InverseKinematicsWindow::gizmos_ui(ui_resources, gizmos_resources);
+    }
+
+    fn gizmos_functionality(ui_resources: &mut UiResources, gizmos_resources: &mut GizmosUiParameters, events: &mut UiEvents) -> Result<()> {
+        InverseKinematicsWindow::gizmos_functionality(ui_resources, gizmos_resources, events)?;
+        Ok(())
     }
 }
 

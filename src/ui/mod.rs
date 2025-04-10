@@ -69,6 +69,8 @@ impl Plugin for RobotLabUiPlugin {
 
         app.add_event::<IkWindowUiEvent>();
 
+        app.register_type::<SelectedEntities>();
+
         app.init_resource::<SceneWindowData>()
             .init_resource::<SelectedEntities>()
             .init_resource::<RobotLabUiAssets>()

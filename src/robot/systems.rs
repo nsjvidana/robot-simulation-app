@@ -110,39 +110,8 @@ fn import_robot(
             rotation: robot_transform.rotation().into(),
         });
     }
-    for transmission in robot.urdf.transmissions.iter() {
-        for trans_joint in transmission.joints.iter() {
-            let joint_idx = robot.urdf.joints
-                .iter()
-                .position(|v| v.name == trans_joint.name)
-                .ok_or_else(|| Error::Urdf {
-                    robot_name: robot.robot_file_path.display().to_string(),
-                    error: format!(
-                        "Import failed: transmission {0} has unknown joint {1}",
-                        transmission.name,
-                        trans_joint.name
-                    )
-                })?;
-            let urdf_joint = &robot.urdf.joints[joint_idx];
-            let rapier_joint = &mut rapier_robot.joints[joint_idx];
-            let joint = &mut rapier_joint.joint;
-            joint.motor_axes = !joint.locked_axes;
-            for i in 0..SPATIAL_DIM {
-                let curr_bit = 1 << i;
-                if (joint.motor_axes.bits() & curr_bit) != 0 {
-                    let motor = &mut joint.motors[i];
-                    motor.max_force = urdf_joint.limit.effort as Real;
-                    if let Some(ctrl) = &urdf_joint.safety_controller {
-                        motor.target_pos = ctrl.k_position as Real;
-                        motor.target_vel = ctrl.k_velocity as Real;
-                    }
-                    else {
-                        motor.target_vel = urdf_joint.limit.velocity as Real;
-                    }
-                }
-            }
-        }
-    }
+
+    set_joint_motors(robot, &mut rapier_robot)?;
 
     let RapierContextMut {
         joints,
@@ -212,6 +181,70 @@ fn import_robot(
         commands
     );
     Ok((robot_links, handles))
+}
+
+fn set_joint_motors(
+    robot: &Robot,
+    rapier_robot: &mut UrdfRobot,
+) -> Result<()> {
+    if robot.other_import_options.all_joints_have_motors {
+        for ((rapier_robot_j, urdf_joint)) in rapier_robot.joints.iter_mut().zip(robot.urdf.joints.iter()) {
+            let joint = &mut rapier_robot_j.joint;
+            joint.motor_axes = !joint.locked_axes;
+            for i in 0..SPATIAL_DIM {
+                let curr_bit = 1 << i;
+                if (joint.motor_axes.bits() & curr_bit) != 0 {
+                    let motor = &mut joint.motors[i];
+                    motor.max_force = urdf_joint.limit.effort as Real;
+                    motor.target_pos = urdf_joint.limit.lower as Real;
+                    if let Some(ctrl) = &urdf_joint.safety_controller {
+                        motor.target_pos = ctrl.k_position as Real;
+                        motor.target_vel = ctrl.k_velocity as Real;
+                    }
+                    else {
+                        motor.target_vel = urdf_joint.limit.velocity as Real;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        for transmission in robot.urdf.transmissions.iter() {
+            for trans_joint in transmission.joints.iter() {
+                let joint_idx = robot.urdf.joints
+                    .iter()
+                    .position(|v| v.name == trans_joint.name)
+                    .ok_or_else(|| Error::Urdf {
+                        robot_name: robot.robot_file_path.display().to_string(),
+                        error: format!(
+                            "Import failed: transmission {0} has unknown joint {1}",
+                            transmission.name,
+                            trans_joint.name
+                        )
+                    })?;
+                let urdf_joint = &robot.urdf.joints[joint_idx];
+                let rapier_joint = &mut rapier_robot.joints[joint_idx];
+                let joint = &mut rapier_joint.joint;
+                joint.motor_axes = !joint.locked_axes;
+                for i in 0..SPATIAL_DIM {
+                    let curr_bit = 1 << i;
+                    if (joint.motor_axes.bits() & curr_bit) != 0 {
+                        let motor = &mut joint.motors[i];
+                        motor.max_force = urdf_joint.limit.effort as Real;
+                        motor.target_pos = urdf_joint.limit.lower as Real;
+                        if let Some(ctrl) = &urdf_joint.safety_controller {
+                            motor.target_pos = ctrl.k_position as Real;
+                            motor.target_vel = ctrl.k_velocity as Real;
+                        }
+                        else {
+                            motor.target_vel = urdf_joint.limit.velocity as Real;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 

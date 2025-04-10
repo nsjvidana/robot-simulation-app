@@ -79,13 +79,15 @@ impl View for SetJointPositionsWindow {
         let (robot, kinematics) = resources.robot_q.get(robot_entity).unwrap();
 
         if !window.waiting_for_ik && window.inverse_kinematics_clicked {
+            let owned_chain = k::Chain::from_nodes(kinematics.chain.iter().cloned().collect());
             events.ik_window_events.send(IkWindowUiEvent {
-                chain: kinematics.chain.clone(),
+                chain: owned_chain,
                 solver_output: window.ik_output.clone(),
                 is_finished: window.is_finished.clone(),
                 canceled: window.canceled.clone(),
                 urdf: robot.urdf.clone(),
                 urdf_path: robot.robot_file_path.clone(),
+                target_pose: kinematics.chain.origin()
             });
             window.waiting_for_ik = true;
         }

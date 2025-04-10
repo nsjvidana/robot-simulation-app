@@ -20,6 +20,7 @@ use bevy_rapier3d::{
 use std::ops::DerefMut;
 use std::sync::Arc;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use parking_lot::Mutex;
 use crate::ui::entity_selection::{EntitySelectionServer, SelectionRequest, SelectionResponse};
 
@@ -59,7 +60,7 @@ fn main() {
         RapierPhysicsPlugin::<()>::default().in_schedule(FixedUpdate),
         RapierDebugRenderPlugin::default(),
         // SalvaPhysicsPlugin::new(),
-        // WorldInspectorPlugin::default(),
+        WorldInspectorPlugin::default(),
     ));
 
     app.add_systems(Startup, startup);
