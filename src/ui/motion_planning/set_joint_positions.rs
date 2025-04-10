@@ -26,7 +26,7 @@ pub struct SetJointPositionsWindow {
 
 impl View for SetJointPositionsWindow {
     fn ui(&mut self, ui: &mut Ui, ui_assets: &RobotLabUiAssets) {
-        let Some(instruction) = self.instruction_copy.clone() else {
+        let Some(instruction) = &mut self.instruction_copy else {
             self.open = false;
             return;
         };
@@ -57,7 +57,12 @@ impl View for SetJointPositionsWindow {
                     });
                 }
             });
-        // ui.withla
+
+        ui.horizontal(|ui| {
+            ui.label("Max error: ");
+            ui.add(egui::DragValue::new(&mut instruction.eps).min_decimals(3));
+        });
+
         self.inverse_kinematics_clicked = ui.button("Inverse Kinematics").clicked();
         self.save_clicked = ui.button("Save").clicked();
     }
