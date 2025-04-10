@@ -447,9 +447,10 @@ pub fn sync_robot_changes(
         let transform = Transform::from(*robot_transform_q.get(robot_entity).unwrap());
         let t = transform.translation;
         let r = transform.rotation;
-        kinematics.chain.set_origin(k::Isometry3 {
+        let iso = k::Isometry3 {
             translation: k::Translation3::new(t.x, t.y, t.z),
             rotation: k::UnitQuaternion::new_unchecked(k::nalgebra::Quaternion::from(r.to_array())),
-        });
+        };
+        kinematics.chain.set_origin(iso * k::UnitQuaternion::new(k::Vector3::x() * -std::f32::consts::FRAC_PI_2));
     }
 }

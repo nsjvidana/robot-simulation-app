@@ -53,7 +53,7 @@ impl Default for ImportWindow {
                 create_colliders_from_collision_shapes: false,
                 make_roots_fixed: true,
                 // Z-up to Y-up.
-                shift: Isometry3::rotation(Vector3::x() * std::f32::consts::FRAC_PI_2),
+                shift: Isometry3::rotation(Vector3::x() * -std::f32::consts::FRAC_PI_2),
                 ..default()
             },
             other_options: default(),
