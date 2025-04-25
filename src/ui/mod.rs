@@ -10,7 +10,7 @@ use bevy::app::App;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use bevy_rapier3d::prelude::{ColliderDebug, ImpulseJoint, MultibodyJoint, RapierDebugRenderPlugin, RapierPickingPlugin, RapierPickingSettings, WriteRapierContext};
+use bevy_rapier3d::prelude::{ColliderDebug, DefaultRapierContext, ImpulseJoint, MultibodyJoint, RapierConfiguration, RapierDebugRenderPlugin, RapierPickingPlugin, RapierPickingSettings, TimestepMode, WriteRapierContext};
 use std::ops::{Deref, DerefMut};
 use bevy::ecs::query::QueryData;
 
@@ -176,7 +176,7 @@ pub struct FunctionalUiResources<'w, 's> {
     pub sim_state: Res<'w, State<SimulationState>>,
     pub multibody_q: Query<'w, 's, &'static MultibodyJoint>,
     pub impulse_joint_q: Query<'w, 's, &'static ImpulseJoint>,
-    pub rapier_context: WriteRapierContext<'w, 's>,
+    pub timestep_mode: ResMut<'w, TimestepMode>,
     pub selections: Res<'w, RobotSelection>,
     pub scene_window_data: Res<'w, SceneWindowData>,
     pub robot_materials: Res<'w, RobotMaterials>,
@@ -331,17 +331,24 @@ macro_rules! impl_util_window {
 
 macro_rules! drag_value {
     ($ui:expr, $label:expr, $field:expr) => {
+        crate::ui::drag_value_decimals!($ui, $label, $field, 3)
+    };
+}
+
+macro_rules! drag_value_decimals {
+    ($ui:expr, $label:expr, $field:expr, $decimals:expr) => {
         $ui.horizontal(|ui| {
             ui.label($label);
             ui.add(
                 egui::DragValue::new(&mut $field)
-                    .min_decimals(3)
-            );
-        });
+                    .min_decimals($decimals)
+            )
+        }).inner
     };
 }
 
 pub(crate) use drag_value;
+pub(crate) use drag_value_decimals;
 use robot_selection::RobotSelection;
 
 pub fn robot_lab_ui(

@@ -1,7 +1,10 @@
 use crate::functionality::simulation::SimulationState;
-use crate::ui::{FunctionalUiResources, View};
-use bevy::prelude::{Commands, CommandsStatesExt};
+use crate::ui::{drag_value, drag_value_decimals, FunctionalUiResources, View};
+use bevy::prelude::*;
 use bevy_egui::egui;
+use bevy_rapier3d::plugin::TimestepMode;
+use bevy_rapier3d::prelude::SimulationToRenderTime;
+use derivative::Derivative;
 
 #[derive(Default)]
 pub struct RunSimulationUi {
@@ -27,6 +30,13 @@ impl View for RunSimulationUi {
                         else { ui.button("Play").clicked() };
                     window.step_clicked = ui.button("Step").clicked();
                     window.reset_clicked = ui.button("Reset").clicked();
+
+                    ui.collapsing("Simulation Parameters", |ui| {
+                        window.time_step_hz_resp = Some(drag_value!(ui, "Timestep frequency (Hz): ", window.time_step_hz));
+                            window.time_step_hz = window.time_step_hz.max(0.0000000001);
+                        window.substeps_resp = Some(drag_value_decimals!(ui, "Substeps: ", window.substeps, 0));
+                            window.substeps = window.substeps.max(1);
+                    });
                 });
             window.open = open;
         }
@@ -66,16 +76,42 @@ impl View for RunSimulationUi {
             res.commands.set_state(SimulationState::Reset);
             window.simulation_state = RunSimulationState::Reset;
         }
+
+        if let (Some(hz), Some(substeps)) = (&window.time_step_hz_resp, &window.substeps_resp) {
+            if hz.changed() {
+                res.commands.insert_resource(Time::<Fixed>::from_hz(window.time_step_hz as f64));
+                let new_dt = 1.0 / window.time_step_hz;
+                match &mut *res.timestep_mode {
+                    TimestepMode::Fixed { dt, .. } => *dt = new_dt,
+                    TimestepMode::Variable { max_dt,.. } => *max_dt = new_dt,
+                    TimestepMode::Interpolated { dt,.. } => *dt = new_dt,
+                }
+            }
+            else if substeps.changed() {
+                match &mut *res.timestep_mode {
+                    TimestepMode::Fixed { substeps, .. } => *substeps = window.substeps,
+                    TimestepMode::Variable { substeps,.. } => *substeps = window.substeps,
+                    TimestepMode::Interpolated { substeps,.. } => *substeps = window.substeps,
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
-#[derive(Default)]
+#[derive(Derivative)]
+#[derivative(Default)]
 pub struct SimulationControlWindow {
     open: bool,
     play_toggled: bool,
     step_clicked: bool,
     reset_clicked: bool,
+    #[derivative(Default(value = "60."))]
+    time_step_hz: f32,
+    substeps: usize,
+    time_step_hz_resp: Option<egui::Response>,
+    substeps_resp: Option<egui::Response>,
     simulation_state: RunSimulationState,
 }
 

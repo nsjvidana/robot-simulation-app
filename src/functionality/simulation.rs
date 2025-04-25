@@ -89,18 +89,6 @@ pub fn simulation_runner(world: &mut World) {
             config_q.single_mut(world).physics_pipeline_active = false;
             world.run_schedule(PhysicsSchedule);
             config_q.single_mut(world).physics_pipeline_active = true;
-            // let prev_dt =
-            //     match &mut *world.resource_mut::<TimestepMode>() {
-            //         TimestepMode::Fixed { dt, .. } => { let prev_dt = *dt; *dt = 0.; prev_dt },
-            //         TimestepMode::Variable { max_dt: dt, .. } => { let prev_dt = *dt; *dt = 0.; prev_dt },
-            //         TimestepMode::Interpolated { dt, .. } => { let prev_dt = *dt; *dt = 0.; prev_dt },
-            //     };
-            // world.run_schedule(PhysicsSchedule);
-            // match &mut *world.resource_mut::<TimestepMode>() {
-            //     TimestepMode::Fixed { dt, .. } => { *dt = prev_dt },
-            //     TimestepMode::Variable { max_dt: dt, .. } => { *dt = prev_dt },
-            //     TimestepMode::Interpolated { dt, .. } => { *dt = prev_dt },
-            // };
             let mut sys_state: SystemState<(
                 Query<&mut RapierRigidBodySet>,
                 Res<TimestepMode>,
