@@ -65,7 +65,6 @@ impl Instruction for SetJointPositionsInstruction {
                 }
             }
             if joint.motor_axes.bits() == finished_motors {
-                println!("ae");
                 finished_joints += 1;
             }
         }

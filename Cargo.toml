@@ -34,8 +34,8 @@ approx = "0.5.1"
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" } # URDF transmissions support
 openrr-planner = { git = "https://github.com/openrr/openrr.git", rev = "bb3e176" } # Force the crate to use urdf-rs v0.9
 
-[profile.dev.package."bevy_rapier3d"]
-opt-level = 3
+[profile.dev]
+opt-level = 1
 
-[profile.dev.package."parry3d"]
+[profile.dev.package."*"]
 opt-level = 3
