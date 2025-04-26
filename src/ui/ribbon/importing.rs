@@ -69,7 +69,7 @@ impl Default for ImportWindow {
                 max_convex_hulls: 128,
                 ..Default::default()
             },
-            all_joints_have_motors: true,
+            all_joints_have_motors: false,
         }
     }
 }

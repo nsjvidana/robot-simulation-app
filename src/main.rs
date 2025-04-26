@@ -53,13 +53,15 @@ pub fn startup(
     });
 
     // Main directional light
-    commands.spawn(
+    commands.spawn((
         DirectionalLight {
             illuminance: light_consts::lux::OVERCAST_DAY,
             shadows_enabled: true,
             ..default()
         },
-    );
+        Transform::from_xyz(3.0, 3.0, 3.0)
+            .looking_at(Vec3::ZERO, Vec3::Y)
+    ));
 
     // Camera
     commands.spawn((

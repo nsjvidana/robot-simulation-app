@@ -61,17 +61,23 @@ impl Plugin for RobotLabUiPlugin {
 
         app.init_utility_window_gizmos(IkWindow::default());
 
+        let if_sim_is_paused = |s: Option<Res<State<SimulationState>>>| {
+            s.is_some_and(|s| *s == SimulationState::Paused || *s == SimulationState::Reset)
+        };
+
         app.configure_sets(
             Update,
             (
                 (
-                    RobotLabUiSet::Prepare,
+                    RobotLabUiSet::Prepare
+                        .run_if(if_sim_is_paused),
                     RobotLabUiSet::Ui,
                 )
                     .chain()
                     .before(selecting::SelectingSet),
                 RobotLabUiSet::Functionality
-                    .after(selecting::SelectingSet),
+                    .after(selecting::SelectingSet)
+                    .run_if(if_sim_is_paused),
             )
         );
 
