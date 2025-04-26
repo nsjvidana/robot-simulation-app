@@ -34,6 +34,15 @@ impl View for RunSimulationUi {
                     ui.collapsing("Simulation Parameters", |ui| {
                         window.time_step_hz_resp = Some(drag_value!(ui, "Timestep frequency (Hz): ", window.time_step_hz));
                             window.time_step_hz = window.time_step_hz.max(0.0000000001);
+
+                        let fps_resp = drag_value_decimals!(ui, "Frames per second: ", window.fps, 3);
+                            window.fps = window.fps.max(0.0000000001);
+                            if fps_resp.hovered() {
+                                fps_resp.show_tooltip_text("The simulation will run this many times each second. \
+                                                                 Doesn't alter the timestep in any way.");
+                            }
+                        window.fps_resp = Some(fps_resp);
+
                         window.substeps_resp = Some(drag_value_decimals!(ui, "Substeps: ", window.substeps, 0));
                             window.substeps = window.substeps.max(1);
                     });
@@ -77,9 +86,12 @@ impl View for RunSimulationUi {
             window.simulation_state = RunSimulationState::Reset;
         }
 
-        if let (Some(hz), Some(substeps)) = (&window.time_step_hz_resp, &window.substeps_resp) {
+        if let (
+            Some(hz),
+            Some(substeps),
+            Some(fps),
+        ) = (&window.time_step_hz_resp, &window.substeps_resp, &window.fps_resp) {
             if hz.changed() {
-                res.commands.insert_resource(Time::<Fixed>::from_hz(window.time_step_hz as f64));
                 let new_dt = 1.0 / window.time_step_hz;
                 match &mut *res.timestep_mode {
                     TimestepMode::Fixed { dt, .. } => *dt = new_dt,
@@ -93,6 +105,9 @@ impl View for RunSimulationUi {
                     TimestepMode::Variable { substeps,.. } => *substeps = window.substeps,
                     TimestepMode::Interpolated { substeps,.. } => *substeps = window.substeps,
                 }
+            }
+            else if fps.changed() {
+                res.commands.insert_resource(Time::<Fixed>::from_hz(window.fps));
             }
         }
 
@@ -109,9 +124,13 @@ pub struct SimulationControlWindow {
     reset_clicked: bool,
     #[derivative(Default(value = "60."))]
     time_step_hz: f32,
+    #[derivative(Default(value = "60."))]
+    fps: f64,
     substeps: usize,
+
     time_step_hz_resp: Option<egui::Response>,
     substeps_resp: Option<egui::Response>,
+    fps_resp: Option<egui::Response>,
     simulation_state: RunSimulationState,
 }
 
