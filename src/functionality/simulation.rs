@@ -4,6 +4,7 @@ use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::systems::{writeback_rigid_bodies, RigidBodyWritebackComponents};
 use bevy_rapier3d::prelude::*;
+use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use crate::functionality::robot::RobotLinks;
 
 pub fn build_plugin(app: &mut App) {
@@ -18,6 +19,12 @@ pub fn build_plugin(app: &mut App) {
     if !app.is_plugin_added::<RapierPhysicsPlugin<NoUserData>>() {
         app.add_plugins(
             RapierPhysicsPlugin::<NoUserData>::default()
+                .in_schedule(PhysicsSchedule)
+        );
+    }
+    if !app.is_plugin_added::<SalvaPhysicsPlugin>() {
+        app.add_plugins(
+            SalvaPhysicsPlugin::default()
                 .in_schedule(PhysicsSchedule)
         );
     }
@@ -75,6 +82,7 @@ pub fn simulation_runner(world: &mut World) {
     }
 
     let mut config_q = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
+    let start = std::time::Instant::now();
     match sim_state {
         SimulationState::Playing => {
             config_q.single_mut(world).physics_pipeline_active = true;
@@ -118,6 +126,9 @@ pub fn simulation_runner(world: &mut World) {
             );
             config_q.single_mut(world).physics_pipeline_active = false;
         },
+    }
+    if sim_state == SimulationState::Playing || sim_state == SimulationState::Stepped {
+        println!("{:?}", 1./start.elapsed().as_secs_f64());
     }
 
     // Upon entering Reset state
