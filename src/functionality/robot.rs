@@ -238,7 +238,7 @@ pub fn init_robots(
                 RapierRobotHandles(handles),
                 RobotLinks(links),
                 RobotSetHandle(robot_set_idx),
-                transform,
+                Transform::from(transform),
             ));
     }
 

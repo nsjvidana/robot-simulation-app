@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use bevy::app::App;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::SystemState;
@@ -33,7 +34,7 @@ pub fn build_plugin(app: &mut App) {
 
     app
         .init_resource::<ResetSimulationSnapshot>()
-        .init_resource::<PreviousSimulationState>();
+        .init_resource::<SimRunnerState>();
 
     app.add_systems(
         PostStartup,
@@ -42,7 +43,7 @@ pub fn build_plugin(app: &mut App) {
     );
 
     app.add_systems(
-        FixedUpdate,
+        PostUpdate,
         simulation_runner
     );
 }
@@ -63,13 +64,23 @@ pub enum SimulationState {
 pub struct ResetSimulationSnapshot(pub Vec<u8>);
 
 #[derive(Resource, Default)]
-struct PreviousSimulationState(SimulationState);
+struct SimRunnerState {
+    prev_state: SimulationState,
+    update_delta: f32,
+}
 
+/// Emulate a FixedUpdate for the physics schedule to prevent synchronization issues with UI changes.
+///
+/// [`TimestepMode`] resource MUST be [`TimestepMode::Fixed`].
 pub fn simulation_runner(world: &mut World) {
-    let prev_sim_state = world.resource::<PreviousSimulationState>().0.clone();
+    let TimestepMode::Fixed { dt, .. } = world
+        .resource::<TimestepMode>()
+        .clone()
+    else { return; };
+
+    let prev_sim_state = world.resource::<SimRunnerState>().prev_state;
     let sim_state = **world.resource::<State<SimulationState>>();
     let sim_state_changed = world.resource_mut::<State<SimulationState>>().is_changed();
-
 
     // Upon exiting Reset state
     if sim_state_changed {
@@ -83,48 +94,60 @@ pub fn simulation_runner(world: &mut World) {
 
     let mut config_q = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
     let start = std::time::Instant::now();
+    let mut run_physics_schedule = |world: &mut World| {
+        let mut update_delta = world.resource::<SimRunnerState>().update_delta;
+            update_delta += world.resource::<Time>().delta_secs();
+        while update_delta > 0. {
+            world.run_schedule(PhysicsSchedule);
+            update_delta -= dt;
+        }
+        world.resource_mut::<SimRunnerState>().update_delta = update_delta;
+    };
     match sim_state {
         SimulationState::Playing => {
             config_q.single_mut(world).physics_pipeline_active = true;
-            world.run_schedule(PhysicsSchedule)
+            run_physics_schedule(world);
         },
         SimulationState::Stepped => {
             config_q.single_mut(world).physics_pipeline_active = true;
-            world.run_schedule(PhysicsSchedule);
+            run_physics_schedule(world);
             world.commands().set_state(SimulationState::Paused);
         },
         SimulationState::Paused | SimulationState::Reset => {
             config_q.single_mut(world).physics_pipeline_active = false;
-            world.run_schedule(PhysicsSchedule);
-            config_q.single_mut(world).physics_pipeline_active = true;
-            let mut sys_state: SystemState<(
-                Query<&mut RapierRigidBodySet>,
-                Res<TimestepMode>,
-                Query<&RapierConfiguration>,
-                Query<&SimulationToRenderTime>,
-                Query<&GlobalTransform>,
-                Query<
-                    RigidBodyWritebackComponents,
-                    (With<RigidBody>, Without<RigidBodyDisabled>),
-                >
-            )> = SystemState::new(world);
-            let (
-                rigid_body_sets,
-                timestep_mode,
-                config,
-                sim_to_render_time,
-                global_transforms,
-                writeback,
-            ) = sys_state.get_mut(world);
-            writeback_rigid_bodies(
-                rigid_body_sets,
-                timestep_mode,
-                config,
-                sim_to_render_time,
-                global_transforms,
-                writeback,
-            );
-            config_q.single_mut(world).physics_pipeline_active = false;
+            run_physics_schedule(world);
+            // Force rigid body writeback
+            {
+                config_q.single_mut(world).physics_pipeline_active = true;
+                let mut sys_state: SystemState<(
+                    Query<&mut RapierRigidBodySet>,
+                    Res<TimestepMode>,
+                    Query<&RapierConfiguration>,
+                    Query<&SimulationToRenderTime>,
+                    Query<&GlobalTransform>,
+                    Query<
+                        RigidBodyWritebackComponents,
+                        (With<RigidBody>, Without<RigidBodyDisabled>),
+                    >
+                )> = SystemState::new(world);
+                let (
+                    rigid_body_sets,
+                    timestep_mode,
+                    config,
+                    sim_to_render_time,
+                    global_transforms,
+                    writeback,
+                ) = sys_state.get_mut(world);
+                writeback_rigid_bodies(
+                    rigid_body_sets,
+                    timestep_mode,
+                    config,
+                    sim_to_render_time,
+                    global_transforms,
+                    writeback,
+                );
+                config_q.single_mut(world).physics_pipeline_active = false;
+            }
         },
     }
     if sim_state == SimulationState::Playing || sim_state == SimulationState::Stepped {
@@ -171,7 +194,7 @@ pub fn simulation_runner(world: &mut World) {
         }
     }
 
-    world.resource_mut::<PreviousSimulationState>().0 = sim_state;
+    world.resource_mut::<SimRunnerState>().prev_state = sim_state;
 }
 
 fn on_enter_reset(world: &mut World) {
