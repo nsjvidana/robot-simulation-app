@@ -30,6 +30,7 @@ parking_lot = "0.12.3"
 downcast-rs = "2.0.1"
 approx = "0.5.1"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] } # Improve bevy runtime performance
+rand = "0.8.5"
 
 [patch.crates-io]
 urdf-rs = { git = "https://github.com/nsjvidana/urdf-rs.git", rev = "809847d" } # URDF transmissions support
