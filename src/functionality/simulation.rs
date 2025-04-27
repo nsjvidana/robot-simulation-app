@@ -9,21 +9,25 @@ use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use crate::functionality::robot::RobotLinks;
 
 pub fn build_plugin(app: &mut App) {
-    app.insert_resource(TimestepMode::Fixed {
-        dt: 1./60.,
-        substeps: 1
-    });
     app.insert_resource(Time::<Fixed>::from_hz(60.));
 
     app.init_schedule(PhysicsSchedule);
 
     if !app.is_plugin_added::<RapierPhysicsPlugin<NoUserData>>() {
+        app.insert_resource(TimestepMode::Fixed {
+            dt: 1./60.,
+            substeps: 1
+        });
         app.add_plugins(
             RapierPhysicsPlugin::<NoUserData>::default()
                 .in_schedule(PhysicsSchedule)
         );
     }
     if !app.is_plugin_added::<SalvaPhysicsPlugin>() {
+        app.insert_resource(bevy_salva3d::plugin::TimestepMode::Fixed {
+            dt: 1./60.,
+            substeps: 1
+        });
         app.add_plugins(
             SalvaPhysicsPlugin::default()
                 .in_schedule(PhysicsSchedule)
