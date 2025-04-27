@@ -1,9 +1,8 @@
 use bevy::prelude::*;
-use bevy_egui::egui::Ui;
-use bevy_rapier3d::prelude::Collider;
 use crate::entity_properties;
-use crate::ui::properties::{EntityProperty, PropertiesUi, TransformProperty};
-use crate::ui::selecting::{MakeSelectionsSet, PickingRequest, PickingRequestCommandExt, PickingResponse, PickingServer};
+use crate::ui::properties::PropertiesUi;
+use crate::ui::properties::transform_prop::TransformProperty;
+use crate::ui::selecting::{MakeSelectionsSet, PickingRequest, PickingRequestCommandExt, PickingResponse};
 use crate::ui::toolbar::ToolbarWindow;
 
 pub fn build_app(app: &mut App) {

@@ -3,7 +3,8 @@ use crate::ui::selecting::{MakeSelectionsSet, PickingExt, PickingRequest, Pickin
 use crate::ui::toolbar::ToolbarWindow;
 use bevy::prelude::*;
 use crate::entity_properties;
-use crate::ui::properties::{EntityProperties, PropertiesUi, TransformProperty};
+use crate::ui::properties::PropertiesUi;
+use crate::ui::properties::transform_prop::TransformProperty;
 
 pub fn build_app(app: &mut App) {
     let robot_selection = RobotSelection::from_world(app.world_mut());
