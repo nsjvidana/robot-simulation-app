@@ -10,7 +10,7 @@ use bevy::app::App;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use bevy_rapier3d::prelude::{ColliderDebug, DefaultRapierContext, ImpulseJoint, MultibodyJoint, RapierConfiguration, RapierDebugRenderPlugin, RapierPickingPlugin, RapierPickingSettings, TimestepMode, WriteRapierContext};
+use bevy_rapier3d::prelude::{Collider, ColliderDebug, DefaultRapierContext, ImpulseJoint, MultibodyJoint, RapierConfiguration, RapierDebugRenderPlugin, RapierPickingPlugin, RapierPickingSettings, TimestepMode, WriteRapierContext};
 use std::ops::{Deref, DerefMut};
 use bevy::ecs::query::QueryData;
 
@@ -189,6 +189,9 @@ pub struct FunctionalUiResources<'w, 's> {
     pub meshes: ResMut<'w, Assets<Mesh>>,
     pub parent: Query<'w, 's, &'static Parent>,
     pub transforms: Query<'w, 's, &'static mut GlobalTransform, Without<Camera3d>>,
+    pub local_transforms: Query<'w, 's, &'static mut Transform, Without<Camera3d>>,
+    pub colliders: Query<'w, 's, (Entity, &'static mut Collider, Option<&'static Parent>)>,
+    pub visual_entities: Query<'w, 's, (Entity, Option<&'static Parent>), (With<VisualEntity>, With<GlobalTransform>)>,
     pub keyboard: Res<'w, ButtonInput<KeyCode>>,
     pub mouse: Res<'w, ButtonInput<MouseButton>>,
     pub commands: Commands<'w, 's>,
@@ -253,6 +256,9 @@ pub struct CameraQueryData {
     camera: &'static Camera3d,
     transform: &'static GlobalTransform,
 }
+
+#[derive(Component)]
+pub struct VisualEntity;
 
 pub trait View {
     fn prepare(&mut self, _functional_ui_resources: &mut FunctionalUiResources) {}

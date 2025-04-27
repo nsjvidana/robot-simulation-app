@@ -1,15 +1,15 @@
 use crate::ui::properties::EntityProperty;
 use crate::ui::{FunctionalUiResources, View};
 use bevy::math::{EulerRot, Quat};
-use bevy::prelude::{Commands, Entity, Transform};
+use bevy::prelude::{Commands, Entity, Transform, Vec3};
 use bevy_egui::egui;
 use bevy_egui::egui::Ui;
+use bevy_rapier3d::prelude::{ColliderDebug, ColliderScale};
 
 pub struct TransformProperty {
     pub entity: Entity,
     pub transform: Transform,
-    pub edit_scale: bool,
-    pub nonzero_scale: bool,
+    pub scaling_options: Option<ScalingOptions>,
 }
 
 impl TransformProperty {
@@ -17,14 +17,15 @@ impl TransformProperty {
         Self {
             entity,
             transform,
-            edit_scale: false,
-            nonzero_scale: false,
+            scaling_options: None,
         }
     }
 
-    pub fn edit_scale(mut self, nonzero_scale: bool) -> Self {
-        self.edit_scale = true;
-        self.nonzero_scale = nonzero_scale;
+    /// Enable editing the transform's scale, and specify whether the scale can be negative or not.
+    pub fn edit_scale(mut self, non_negative_scale: bool) -> Self {
+        let mut options = ScalingOptions::default();
+        options.non_negative_scale = non_negative_scale;
+        self.scaling_options = Some(options);
         self
     }
 }
@@ -32,15 +33,17 @@ impl TransformProperty {
 impl View for TransformProperty {
     fn prepare(&mut self, res: &mut FunctionalUiResources) {
         let TransformProperty { entity, transform, ..} = self;
+        let scale = transform.scale;
         let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
-        *transform = (*curr_trans).into();
+        *transform = Transform::from(*curr_trans);
+        // Conserve scale
+        transform.scale = scale;
     }
 
     fn ui(&mut self, ui: &mut Ui, _commands: &mut Commands) {
         let TransformProperty {
             transform,
-            edit_scale,
-            nonzero_scale ,
+            scaling_options,
             ..
         } = self;
         ui.horizontal(|ui| {
@@ -69,31 +72,83 @@ impl View for TransformProperty {
             }
         });
 
-        if *edit_scale {
+        if let Some(scaling_options) = scaling_options {
             ui.horizontal(|ui| {
                 ui.label("Scale: ");
                 let prev_scale = transform.scale;
+
+                let uniform_resp = ui.checkbox(&mut scaling_options.uniform_scale, "Uniform Scale");
                 let x_resp = ui.add(egui::DragValue::new(&mut transform.scale.x).min_decimals(3).speed(0.1));
                 let y_resp = ui.add(egui::DragValue::new(&mut transform.scale.y).min_decimals(3).speed(0.1));
                 let z_resp = ui.add(egui::DragValue::new(&mut transform.scale.z).min_decimals(3).speed(0.1));
-                let changed =  x_resp.changed() || y_resp.changed() || z_resp.changed();
-                if *nonzero_scale &&
-                    changed &&
-                    (transform.scale.x <= 0. ||
-                    transform.scale.y <= 0. ||
-                    transform.scale.z <= 0.)
-                {
-                    transform.scale = prev_scale;
+
+                let changed =  x_resp.changed() || y_resp.changed() || z_resp.changed() || uniform_resp.changed();
+                if changed {
+                    // Ensure that the scale is a nonzero scale
+                    if scaling_options.non_negative_scale &&
+                        (transform.scale.x <= 0. ||
+                            transform.scale.y <= 0. ||
+                            transform.scale.z <= 0.)
+                    {
+                        transform.scale = prev_scale;
+                    }
+                    // Ensure that the scale is uniform
+                    if scaling_options.uniform_scale {
+                        if x_resp.changed() {
+                            transform.scale = Vec3::splat(transform.scale.x);
+                        }
+                        if y_resp.changed() {
+                            transform.scale = Vec3::splat(transform.scale.y);
+                        }
+                        if z_resp.changed() {
+                            transform.scale = Vec3::splat(transform.scale.z);
+                        }
+                    }
+                    // TODO: register undo action
                 }
-            });
-            // TODO: register undo action
+                });
+            if !scaling_options.uniform_scale {
+                ui.horizontal(|ui| {
+                    ui.label("Non-Uniform Scale Subdivisions: ");
+                    ui.add(
+                        egui::DragValue::new(&mut scaling_options.uniform_scale_subdivisions).min_decimals(0)
+                    );
+                });
+            }
         }
     }
 
     fn functionality(&mut self, res: &mut FunctionalUiResources) -> crate::prelude::Result<()> {
-        let TransformProperty { transform, entity, .. } = self;
-        let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
-        *curr_trans = (*transform).into();
+        let TransformProperty { transform, entity, scaling_options, .. } = self;
+        *res.local_transforms
+            .get_mut(*entity)
+            .unwrap() = transform
+                .with_scale(Vec3::ONE)
+                .into();
+        if scaling_options.is_some() {
+            // Update collider scales
+            for coll_e in res.colliders
+                .iter_mut()
+                .filter(|(e, _, par)| par.is_some_and(|p| p.get() == *entity) || *e == *entity)
+                .map(|v| v.0)
+            {
+                res.commands.entity(coll_e)
+                    .insert(ColliderScale::Relative(Vec3::ONE));
+                if let Ok(mut trans) = res.local_transforms.get_mut(coll_e) {
+                    *trans = trans.with_scale(transform.scale).into();
+                }
+            }
+            // Udpate scale of visuals
+            for vis_e in res.visual_entities
+                .iter_mut()
+                .filter(|(e, par)| par.is_some_and(|p| p.get() == *entity) || *e == *entity)
+                .map(|v| v.0)
+            {
+                if let Ok(mut trans) = res.local_transforms.get_mut(vis_e) {
+                    *trans = trans.with_scale(transform.scale).into();
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -101,5 +156,21 @@ impl View for TransformProperty {
 impl EntityProperty for TransformProperty {
     fn property_name(&self) -> &'static str {
         "Transform"
+    }
+}
+
+pub struct ScalingOptions {
+    pub non_negative_scale: bool,
+    pub uniform_scale: bool,
+    pub uniform_scale_subdivisions: u32,
+}
+
+impl Default for ScalingOptions {
+    fn default() -> Self {
+        Self {
+            non_negative_scale: true,
+            uniform_scale: true,
+            uniform_scale_subdivisions: 16,
+        }
     }
 }

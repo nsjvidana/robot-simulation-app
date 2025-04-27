@@ -25,6 +25,7 @@ use crate::error::{error_handling_system, Error};
 use crate::functionality::import::RobotJointType;
 use crate::prelude::*;
 use crate::prelude::Real;
+use crate::ui::VisualEntity;
 
 pub fn build_plugin(app: &mut App) {
     app
@@ -452,6 +453,7 @@ fn create_rapier_robot_entities(
                 else { white_mat.clone() };
             for h in mesh_handles {
                 visual_entities.push(commands.spawn((
+                    VisualEntity,
                     Mesh3d(h),
                     MeshMaterial3d(mat_h.clone()),
                 )).id());
@@ -509,16 +511,9 @@ fn create_rapier_robot_entities(
                 RapierColliderHandle(coll_handle),
             )
         };
-        if let Some(first_coll_handle) = link.colliders.first().cloned() {
-            let coll = colliders.get_mut(first_coll_handle).unwrap();
-            rb_e_cmd.insert(collider_components(coll, first_coll_handle));
-            coll.user_data = rb_e_cmd.id().to_bits() as u128;
-            entity2collider.insert(rb_e_cmd.id(), first_coll_handle);
-            collider_entities.push(rb_e_cmd.id());
-        }
         let rb_e = rb_e_cmd.id();
         std::mem::drop(rb_e_cmd);
-        for coll_handle in link.colliders.iter().cloned().skip(1) {
+        for coll_handle in link.colliders.iter().cloned() {
             let coll = colliders.get_mut(coll_handle).unwrap();
             let coll_e = commands.spawn((
                 collider_components(coll, coll_handle),
