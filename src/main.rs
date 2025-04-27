@@ -6,10 +6,7 @@ use bevy::prelude::*;
 use bevy::DefaultPlugins;
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
-use bevy_rapier3d::prelude::{MultibodyJoint, RapierPickable, TypedJoint};
-use bevy_rapier3d::rapier::prelude::SPATIAL_DIM;
-use rand::Rng;
-use crate::functionality::simulation::PhysicsSchedule;
+use bevy_rapier3d::prelude::RapierPickable;
 
 pub mod ui;
 pub mod functionality;
@@ -32,18 +29,6 @@ fn main() {
     app.add_event::<ErrorEvent>();
 
     app.add_systems(Startup, startup);
-
-    app.add_systems(PhysicsSchedule, |mut mbjs: Query<&mut MultibodyJoint>| {
-        for mut mbj in mbjs.iter_mut() {
-            let j = &mut mbj.data.as_mut().raw;
-            for motor_idx in 0..SPATIAL_DIM {
-                if (j.motor_axes.bits() & 1 << motor_idx) != 0 {
-                    let limit = j.limits[motor_idx];
-                    j.motors[motor_idx].target_pos = rand::thread_rng().gen_range(limit.min..limit.max);
-                }
-            }
-        }
-    });
 
     app.add_systems(Update, |mut errs: EventReader<ErrorEvent>| {
         for err in errs.read() {

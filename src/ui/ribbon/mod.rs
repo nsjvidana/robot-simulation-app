@@ -4,12 +4,14 @@ use motion_planning::MotionPlanningUi;
 use crate::ui::ribbon::importing::ImportUi;
 use crate::ui::ribbon::run_simulation::RunSimulationUi;
 use crate::ui::{FunctionalUiResources, View};
+use crate::ui::ribbon::fluids::FluidsUi;
 use crate::ui::ribbon::place_object::PlaceObjectUi;
 
 pub mod importing;
 pub mod run_simulation;
 pub mod motion_planning;
 pub mod place_object;
+pub mod fluids;
 
 pub struct Ribbon {
     pub sections: Vec<Box<dyn View>>,
@@ -24,6 +26,7 @@ impl Default for Ribbon {
                 Box::new(PlaceObjectUi::default()),
                 Box::new(RunSimulationUi::default()),
                 Box::new(MotionPlanningUi::default()),
+                Box::new(FluidsUi::default()),
             ],
             min_height: 50.,
         }

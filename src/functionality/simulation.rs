@@ -63,10 +63,10 @@ pub enum SimulationState {
 pub struct ResetSimulationSnapshot(pub Vec<u8>);
 
 #[derive(Resource, Default)]
-struct PreviousSimulationState(SimulationState, usize, f64);
+struct PreviousSimulationState(SimulationState);
 
 pub fn simulation_runner(world: &mut World) {
-    let prev_sim_state = world.resource::<PreviousSimulationState>().0;
+    let prev_sim_state = world.resource::<PreviousSimulationState>().0.clone();
     let sim_state = **world.resource::<State<SimulationState>>();
     let sim_state_changed = world.resource_mut::<State<SimulationState>>().is_changed();
 
@@ -128,15 +128,7 @@ pub fn simulation_runner(world: &mut World) {
         },
     }
     if sim_state == SimulationState::Playing || sim_state == SimulationState::Stepped {
-        let PreviousSimulationState(_, frame_count, total_fps) = &mut *world.resource_mut::<PreviousSimulationState>();
-        *frame_count += 1;
-        *total_fps += 1./start.elapsed().as_secs_f64();
-        if *frame_count == 1000 {
-            println!("{}", *total_fps / 1000.);
-            *frame_count = 0;
-            *total_fps = 0.;
-        }
-        // println!("{:?}", 1./start.elapsed().as_secs_f64());
+        println!("{:?}", 1./start.elapsed().as_secs_f64());
     }
 
     // Upon entering Reset state
