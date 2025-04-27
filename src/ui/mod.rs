@@ -39,6 +39,10 @@ impl Plugin for RobotLabUiPlugin {
             });
         }
         if !app.is_plugin_added::<RapierPickingPlugin>() {
+            app.insert_resource(RapierPickingSettings {
+                require_markers: true,
+                ..Default::default()
+            });
             app.add_plugins(RapierPickingPlugin);
         }
 

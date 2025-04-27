@@ -93,7 +93,6 @@ pub fn simulation_runner(world: &mut World) {
     }
 
     let mut config_q = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
-    let start = std::time::Instant::now();
     let mut run_physics_schedule = |world: &mut World| {
         let mut update_delta = world.resource::<SimRunnerState>().update_delta;
             update_delta += world.resource::<Time>().delta_secs();
@@ -149,9 +148,6 @@ pub fn simulation_runner(world: &mut World) {
                 config_q.single_mut(world).physics_pipeline_active = false;
             }
         },
-    }
-    if sim_state == SimulationState::Playing || sim_state == SimulationState::Stepped {
-        println!("{:?}", 1./start.elapsed().as_secs_f64());
     }
 
     // Upon entering Reset state
