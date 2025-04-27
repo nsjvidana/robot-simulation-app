@@ -1,5 +1,8 @@
 use bevy::prelude::*;
+use bevy_egui::egui::Ui;
 use bevy_rapier3d::prelude::Collider;
+use crate::entity_properties;
+use crate::ui::properties::{EntityProperty, PropertiesUi, TransformProperty};
 use crate::ui::selecting::{MakeSelectionsSet, PickingRequest, PickingRequestCommandExt, PickingResponse, PickingServer};
 use crate::ui::toolbar::ToolbarWindow;
 
@@ -33,17 +36,26 @@ impl FromWorld for GenericObjSelection {
 
 pub fn select_generic_objects(
     selection: ResMut<GenericObjSelection>,
-    mut toolbar_window: ResMut<ToolbarWindow>
+    mut properties_ui: ResMut<PropertiesUi>,
+    mut toolbar_window: ResMut<ToolbarWindow>,
+    generic_objs: Query<(&Name, &GlobalTransform), With<GenericObject>>,
 ) {
     if let Some(entity) = selection.picking_resp
         .take_response()
         .map(|v| v.event.entity)
     {
+        let (name, transform) = generic_objs.get(entity).unwrap();
+        properties_ui.entity_properties = Some(entity_properties!(
+            name.to_string(),
+            TransformProperty::new(entity, (*transform).into())
+                .edit_scale(true)
+        ));
         toolbar_window.active_movable_entity = Some(entity);
     }
 
     if selection.picking_resp.unpicked() {
         selection.picking_resp.reset_unpicked();
         toolbar_window.active_movable_entity = None;
+        properties_ui.entity_properties = None;
     }
 }

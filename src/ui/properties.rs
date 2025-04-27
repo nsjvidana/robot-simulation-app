@@ -1,8 +1,8 @@
+use crate::error::error_handling_system;
 use crate::ui::{FunctionalUiResources, RobotLabUiSet, UiSet, View};
 use bevy::prelude::*;
+use bevy_egui::egui::{Ui, Widget};
 use bevy_egui::{egui, EguiContexts};
-use bevy_egui::egui::Ui;
-use crate::error::error_handling_system;
 
 pub fn build_app(app: &mut App) {
     app.init_resource::<PropertiesUi>();
@@ -41,7 +41,10 @@ pub fn build_app(app: &mut App) {
 
 #[derive(Resource, Default)]
 pub struct PropertiesUi {
-    pub selected_entity: Option<EntityProperties>,
+    /// (Entity name, Vec of entity properties)
+    ///
+    /// Set to [`None`] if no entity is selected
+    pub entity_properties: Option<(String, Vec<Box<dyn EntityProperty>>)>,
     open: bool,
 }
 
@@ -59,56 +62,25 @@ impl PropertiesUi {
 
 impl View for PropertiesUi {
     fn prepare(&mut self, res: &mut FunctionalUiResources) {
-        let Some(props) = &mut self.selected_entity else {
-            return;
-        };
-        match props {
-            EntityProperties::Robot { entity, transform, .. } => {
-                let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
-                *transform = (*curr_trans).into();
+        if let Some((_, props)) = &mut self.entity_properties {
+            for property in props {
+                property.prepare(res);
             }
-            EntityProperties::GenericObject { .. } => {}
         }
     }
 
     fn ui(&mut self, ui: &mut Ui, commands: &mut Commands) {
-        let Some(props) = &mut self.selected_entity else {
-            ui.heading("Properites (None)");
-            return;
-        };
-        match props {
-            EntityProperties::Robot { name, transform, .. } => {
-                ui.heading(format!("\"{name}\" Robot Properties"));
-                ui.collapsing("Transform (XYZ)", |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Translation: ");
-                        let x_resp = ui.add(egui::DragValue::new(&mut transform.translation.x).min_decimals(3));
-                        let y_resp = ui.add(egui::DragValue::new(&mut transform.translation.y).min_decimals(3));
-                        let z_resp = ui.add(egui::DragValue::new(&mut transform.translation.z).min_decimals(3));
-                    });
-
-                    ui.horizontal(|ui| {
-                        let (mut x, mut y, mut z) = transform.rotation.to_euler(EulerRot::XYZ);
-                            x = x.to_degrees();
-                            y = y.to_degrees();
-                            z = z.to_degrees();
-                        ui.label("Rotation: ");
-                        let x_resp = ui.add(egui::DragValue::new(&mut x).min_decimals(3));
-                        let y_resp = ui.add(egui::DragValue::new(&mut y).min_decimals(3));
-                        let z_resp = ui.add(egui::DragValue::new(&mut z).min_decimals(3));
-                        let changed = x_resp.changed() ||
-                            y_resp.changed() ||
-                            z_resp.changed();
-                        if changed {
-                            transform.rotation = Quat::from_euler(EulerRot::XYZ, x.to_radians(), y.to_radians(), z.to_radians());
-                            // TODO: register undo action
-                        }
-                    });
+        if let Some((entity_name, props)) = self.entity_properties.as_mut() {
+            ui.heading(format!("Properties: {}", entity_name));
+            for property in props.iter_mut() {
+                ui.collapsing(property.property_name(), |ui| {
+                    property.ui(ui, commands);
                 });
             }
-            EntityProperties::GenericObject { entity, transform, .. } => {
-                todo!()
-            }
+        }
+        else {
+            ui.heading("Properties");
+            ui.label("No properties available");
         }
     }
 
@@ -118,18 +90,111 @@ impl View for PropertiesUi {
         }
         if !self.open { return Ok(()); }
 
-        let Some(props) = &mut self.selected_entity else {
-            return Ok(());
-        };
-        match props {
-            EntityProperties::Robot { entity, transform,.. } => {
-                let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
-                *curr_trans = (*transform).into();
+        if let Some((_, props)) = self.entity_properties.as_mut() {
+            for property in props.iter_mut() {
+                property.functionality(res)?
             }
-            EntityProperties::GenericObject { entity, .. } => {}
         }
-
         Ok(())
+    }
+}
+
+pub struct TransformProperty {
+    pub entity: Entity,
+    pub transform: Transform,
+    pub edit_scale: bool,
+    pub nonzero_scale: bool,
+}
+
+impl TransformProperty {
+    pub fn new(entity: Entity, transform: Transform) -> Self {
+        Self {
+            entity,
+            transform,
+            edit_scale: false,
+            nonzero_scale: false,
+        }
+    }
+
+    pub fn edit_scale(mut self, nonzero_scale: bool) -> Self {
+        self.edit_scale = true;
+        self.nonzero_scale = nonzero_scale;
+        self
+    }
+}
+
+impl View for TransformProperty {
+    fn prepare(&mut self, res: &mut FunctionalUiResources) {
+        let TransformProperty { entity, transform, ..} = self;
+        let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
+        *transform = (*curr_trans).into();
+    }
+
+    fn ui(&mut self, ui: &mut Ui, _commands: &mut Commands) {
+        let TransformProperty {
+            transform,
+            edit_scale,
+            nonzero_scale ,
+            ..
+        } = self;
+        ui.horizontal(|ui| {
+            ui.label("Translation: ");
+            let _x_resp = ui.add(egui::DragValue::new(&mut transform.translation.x).min_decimals(3));
+            let _y_resp = ui.add(egui::DragValue::new(&mut transform.translation.y).min_decimals(3));
+            let _z_resp = ui.add(egui::DragValue::new(&mut transform.translation.z).min_decimals(3));
+            // TODO: register undo action
+        });
+
+        ui.horizontal(|ui| {
+            let (mut x, mut y, mut z) = transform.rotation.to_euler(EulerRot::XYZ);
+            x = x.to_degrees();
+            y = y.to_degrees();
+            z = z.to_degrees();
+            ui.label("Rotation: ");
+            let x_resp = ui.add(egui::DragValue::new(&mut x).min_decimals(3));
+            let y_resp = ui.add(egui::DragValue::new(&mut y).min_decimals(3));
+            let z_resp = ui.add(egui::DragValue::new(&mut z).min_decimals(3));
+            let changed = x_resp.changed() ||
+                y_resp.changed() ||
+                z_resp.changed();
+            if changed {
+                transform.rotation = Quat::from_euler(EulerRot::XYZ, x.to_radians(), y.to_radians(), z.to_radians());
+                // TODO: register undo action
+            }
+        });
+
+        if *edit_scale {
+            ui.horizontal(|ui| {
+                ui.label("Scale: ");
+                let prev_scale = transform.scale;
+                let x_resp = ui.add(egui::DragValue::new(&mut transform.scale.x).min_decimals(3).speed(0.1));
+                let y_resp = ui.add(egui::DragValue::new(&mut transform.scale.y).min_decimals(3).speed(0.1));
+                let z_resp = ui.add(egui::DragValue::new(&mut transform.scale.z).min_decimals(3).speed(0.1));
+                let changed =  x_resp.changed() || y_resp.changed() || z_resp.changed();
+                if *nonzero_scale &&
+                    changed &&
+                    (transform.scale.x <= 0. ||
+                    transform.scale.y <= 0. ||
+                    transform.scale.z <= 0.)
+                {
+                    transform.scale = prev_scale;
+                }
+            });
+            // TODO: register undo action
+        }
+    }
+
+    fn functionality(&mut self, res: &mut FunctionalUiResources) -> crate::prelude::Result<()> {
+        let TransformProperty { transform, entity, .. } = self;
+        let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
+        *curr_trans = (*transform).into();
+        Ok(())
+    }
+}
+
+impl EntityProperty for TransformProperty {
+    fn property_name(&self) -> &'static str {
+        "Transform"
     }
 }
 
@@ -143,4 +208,16 @@ pub enum EntityProperties {
         entity: Entity,
         transform:  Transform,
     },
+}
+
+// TODO: rename this to EntityProperties
+pub trait EntityProperty: View + Send + Sync {
+    fn property_name(&self) -> &'static str;
+}
+
+#[macro_export]
+macro_rules! entity_properties {
+    ($entity_name:expr, $($rest:expr),+) => {
+        ($entity_name, vec![$(Box::new($rest)),+])
+    };
 }

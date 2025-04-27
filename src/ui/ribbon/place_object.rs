@@ -1,11 +1,11 @@
 use crate::ui::generic_object::GenericObject;
-use crate::ui::selecting::PickingExt;
 use crate::ui::{FunctionalUiResources, View};
 use bevy::math::Vec3;
-use bevy::prelude::{Commands, GlobalTransform, Mesh3d, MeshMaterial3d};
+use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
+use crate::ui::selecting::PickingExt;
 
 #[derive(Default)]
 pub struct PlaceObjectUi {
@@ -40,14 +40,34 @@ impl View for PlaceObjectUi {
         if self.cuboid {
             commands
                 .spawn((
-                    RigidBody::Fixed,
-                    GlobalTransform::from_translation(Vec3::X),
+                    Name::new("Cuboid"),
+                    RigidBody::Dynamic,
+                    GlobalTransform::default(),
                     Collider::cuboid(0.5, 0.5, 0.5),
-                    Mesh3d(meshes.add(bevy::math::primitives::Cuboid::new(1., 1., 1.))),
+                    Mesh3d(meshes.add(Cuboid::new(1., 1., 1.))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
                 .make_entity_pickable();
+        }
+        if self.ball {
+            commands
+                .spawn((
+                    Name::new("Ball"),
+                    RigidBody::Dynamic,
+                    GlobalTransform::default(),
+                    Collider::ball(0.5),
+                    Mesh3d(meshes.add(Sphere::new(0.5))),
+                    MeshMaterial3d(robot_materials.white_mat.clone()),
+                    GenericObject,
+                ))
+                .make_entity_pickable();
+        }
+        if self.cone {
+
+        }
+        if self.cylinder {
+
         }
 
         Ok(())

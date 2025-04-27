@@ -2,7 +2,8 @@ use crate::functionality::robot::{RobotEntity, RobotPart};
 use crate::ui::selecting::{MakeSelectionsSet, PickingExt, PickingRequest, PickingRequestCommandExt, PickingResponse, SelectingSet};
 use crate::ui::toolbar::ToolbarWindow;
 use bevy::prelude::*;
-use crate::ui::properties::{EntityProperties, PropertiesUi};
+use crate::entity_properties;
+use crate::ui::properties::{EntityProperties, PropertiesUi, TransformProperty};
 
 pub fn build_app(app: &mut App) {
     let robot_selection = RobotSelection::from_world(app.world_mut());
@@ -66,15 +67,10 @@ pub fn select_robots(
             selections.active_robot = Some(robot_e);
             toolbar_window.active_movable_entity = Some(robot_e);
             let (trans, robot) = robots.get(robot_e).unwrap();
-            properties_ui.selected_entity = Some(EntityProperties::Robot {
-                entity: robot_e,
-                name: robot.urdf.name.clone(),
-                transform: Transform {
-                    translation: trans.translation(),
-                    rotation: trans.rotation(),
-                    scale: trans.scale(),
-                },
-            });
+            properties_ui.entity_properties = Some(entity_properties!(
+                robot.urdf.name.clone(),
+                TransformProperty::new(robot_e, (*trans).into())
+            ));
             if !resp.shift_click {
                 selections.selected_robots.clear();
             }
@@ -86,6 +82,7 @@ pub fn select_robots(
         selections.robot_picking_resp.reset_unpicked();
         selections.active_robot = None;
         toolbar_window.active_movable_entity = None;
+        properties_ui.entity_properties = None;
         selections.selected_robots.clear();
     }
 }
