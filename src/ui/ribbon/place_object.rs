@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
+use crate::functionality::simulation::SimulationState;
 
 #[derive(Default)]
 pub struct PlaceObjectUi {
@@ -34,8 +35,13 @@ impl View for PlaceObjectUi {
             commands,
             robot_materials,
             meshes,
+            sim_state,
             ..
         } = res;
+        if **sim_state != SimulationState::Reset {
+            return Ok(());
+        }
+
         if self.cuboid {
             commands
                 .spawn((
@@ -65,10 +71,32 @@ impl View for PlaceObjectUi {
                 .make_entity_pickable();
         }
         if self.cone {
-
+            commands
+                .spawn((
+                    Name::new("Cone"),
+                    RigidBody::Dynamic,
+                    Collider::cone(0.5, 0.5),
+                    InheritedVisibility::default(),
+                    VisualEntity,
+                    Mesh3d(meshes.add(Cone::new(0.5, 1.))),
+                    MeshMaterial3d(robot_materials.white_mat.clone()),
+                    GenericObject,
+                ))
+                .make_entity_pickable();
         }
         if self.cylinder {
-
+            commands
+                .spawn((
+                    Name::new("Cylinder"),
+                    RigidBody::Dynamic,
+                    Collider::cylinder(0.5, 0.5),
+                    InheritedVisibility::default(),
+                    VisualEntity,
+                    Mesh3d(meshes.add(Cylinder::new(0.5, 1.))),
+                    MeshMaterial3d(robot_materials.white_mat.clone()),
+                    GenericObject,
+                ))
+                .make_entity_pickable();
         }
 
         Ok(())
