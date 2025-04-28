@@ -7,6 +7,9 @@ use bevy::DefaultPlugins;
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 use bevy_rapier3d::prelude::RapierPickable;
+use bevy_salva3d::fluid::FluidPositions;
+use bevy_salva3d::plugin::SalvaPhysicsPlugin;
+use bevy_salva3d::utils::cube_particle_positions;
 
 pub mod ui;
 pub mod functionality;
@@ -29,6 +32,17 @@ fn main() {
     app.add_event::<ErrorEvent>();
 
     app.add_systems(Startup, startup);
+    app.add_systems(Update, |fluids: Query<&FluidPositions>, mut gizmos: Gizmos| {
+        for positions in fluids.iter() {
+            for pos in positions.iter().copied() {
+                gizmos.sphere(
+                    pos,
+                    SalvaPhysicsPlugin::DEFAULT_PARTICLE_RADIUS,
+                    Color::linear_rgb(1., 1., 0.)
+                );
+            }
+        }
+    });
 
     app.add_systems(Update, |mut errs: EventReader<ErrorEvent>| {
         for err in errs.read() {
@@ -71,4 +85,6 @@ pub fn startup(
         FlyCam,
         RapierPickable,
     ));
+
+    commands.spawn(FluidPositions(cube_particle_positions(10, 10, 10, SalvaPhysicsPlugin::DEFAULT_PARTICLE_RADIUS)));
 }

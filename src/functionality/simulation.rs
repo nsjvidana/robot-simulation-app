@@ -5,7 +5,8 @@ use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::systems::{writeback_rigid_bodies, RigidBodyWritebackComponents};
 use bevy_rapier3d::prelude::*;
-use bevy_salva3d::plugin::SalvaPhysicsPlugin;
+use bevy_salva3d::fluid::{FluidAccelerations, FluidPositions, FluidVelocities};
+use bevy_salva3d::plugin::{DefaultSalvaContext, SalvaConfiguration, SalvaPhysicsPlugin};
 use crate::functionality::robot::RobotLinks;
 
 pub fn build_plugin(app: &mut App) {
@@ -65,7 +66,11 @@ pub enum SimulationState {
 }
 
 #[derive(Resource, Default, Clone)]
-pub struct ResetSimulationSnapshot(pub Vec<u8>);
+pub struct ResetSimulationSnapshot {
+    pub rapier: Vec<u8>,
+    /// Contains Vec<(Entity, FluidPositions, FluidVelocities, FluidAccelerations)>.
+    pub salva: Vec<u8>,
+}
 
 #[derive(Resource, Default)]
 struct SimRunnerState {
@@ -96,7 +101,9 @@ pub fn simulation_runner(world: &mut World) {
         }
     }
 
-    let mut config_q = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
+    let mut rapier_config = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
+    let mut salva_config = world.query_filtered::<&mut SalvaConfiguration, With<DefaultSalvaContext>>();
+
     let mut run_physics_schedule = |world: &mut World| {
         let mut update_delta = world.resource::<SimRunnerState>().update_delta;
             update_delta += world.resource::<Time>().delta_secs();
@@ -106,22 +113,23 @@ pub fn simulation_runner(world: &mut World) {
         }
         world.resource_mut::<SimRunnerState>().update_delta = update_delta;
     };
+
     match sim_state {
         SimulationState::Playing => {
-            config_q.single_mut(world).physics_pipeline_active = true;
+            rapier_config.single_mut(world).physics_pipeline_active = true;
             run_physics_schedule(world);
         },
         SimulationState::Stepped => {
-            config_q.single_mut(world).physics_pipeline_active = true;
+            rapier_config.single_mut(world).physics_pipeline_active = true;
             run_physics_schedule(world);
             world.commands().set_state(SimulationState::Paused);
         },
         SimulationState::Paused | SimulationState::Reset => {
-            config_q.single_mut(world).physics_pipeline_active = false;
+            rapier_config.single_mut(world).physics_pipeline_active = false;
             run_physics_schedule(world);
             // Force rigid body writeback
             {
-                config_q.single_mut(world).physics_pipeline_active = true;
+                rapier_config.single_mut(world).physics_pipeline_active = true;
                 let mut sys_state: SystemState<(
                     Query<&mut RapierRigidBodySet>,
                     Res<TimestepMode>,
@@ -149,7 +157,7 @@ pub fn simulation_runner(world: &mut World) {
                     global_transforms,
                     writeback,
                 );
-                config_q.single_mut(world).physics_pipeline_active = false;
+                rapier_config.single_mut(world).physics_pipeline_active = false;
             }
         },
     }
@@ -160,7 +168,7 @@ pub fn simulation_runner(world: &mut World) {
             SimulationState::Reset =>
                 if prev_sim_state != SimulationState::Reset {
                     on_enter_reset(world);
-                    config_q.single_mut(world).physics_pipeline_active = true;
+                    rapier_config.single_mut(world).physics_pipeline_active = true;
                     let mut sys_state: SystemState<(
                         Query<&mut RapierRigidBodySet>,
                         Res<TimestepMode>,
@@ -188,7 +196,7 @@ pub fn simulation_runner(world: &mut World) {
                        global_transforms,
                        writeback,
                     );
-                    config_q.single_mut(world).physics_pipeline_active = false;
+                    rapier_config.single_mut(world).physics_pipeline_active = false;
                 },
             _ => {}
         }
@@ -198,8 +206,7 @@ pub fn simulation_runner(world: &mut World) {
 }
 
 fn on_enter_reset(world: &mut World) {
-    let snapshot = world.resource_mut::<ResetSimulationSnapshot>();
-    if !snapshot.0.is_empty() {
+    if !world.resource::<ResetSimulationSnapshot>().rapier.is_empty() {
         let (
             simulation,
             colliders,
@@ -212,7 +219,7 @@ fn on_enter_reset(world: &mut World) {
             RapierContextJoints,
             RapierQueryPipeline,
             RapierRigidBodySet,
-        ) = bincode::deserialize(&snapshot.0).unwrap();
+        ) = bincode::deserialize(&world.resource::<ResetSimulationSnapshot>().rapier).unwrap();
 
         let mut ctx_q = world.query_filtered::<
             (
@@ -238,22 +245,57 @@ fn on_enter_reset(world: &mut World) {
         *ctx_query_pipeline = query_pipeline;
         *ctx_rigidbody_set = rigidbody_set;
     }
+
+    if !world.resource::<ResetSimulationSnapshot>().salva.is_empty() {
+        let salva_ser_data: Vec<(Entity, FluidPositions, FluidVelocities, FluidAccelerations)> =
+            bincode::deserialize(&world.resource::<ResetSimulationSnapshot>().salva)
+                .unwrap();
+        let mut fluids_q = world.query::<(
+            &mut FluidPositions,
+            &mut FluidVelocities,
+            &mut FluidAccelerations,
+        )>();
+        for (entity, positions, vels, accs) in salva_ser_data {
+            let (
+                mut curr_positions,
+                mut curr_vels,
+                mut curr_accs
+            ) = fluids_q.get_mut(world, entity)
+                .unwrap();
+            *curr_positions = positions;
+            *curr_vels = vels;
+            *curr_accs = accs;
+        }
+    }
 }
 
 fn on_exit_reset(world: &mut World) {
-    let mut ctx_q = world.query_filtered::<RapierContext, With<DefaultRapierContext>>();
+    let mut rapier_q = world.query_filtered::<RapierContext, With<DefaultRapierContext>>();
     let RapierContextItem {
         simulation,
         colliders,
         joints,
         query_pipeline,
         rigidbody_set,
-    } = ctx_q.single(world);
-    world.resource_mut::<ResetSimulationSnapshot>().0 = bincode::serialize(&(
+    } = rapier_q.single(world);
+    world.resource_mut::<ResetSimulationSnapshot>().rapier = bincode::serialize(&(
         simulation,
         colliders,
         joints,
         query_pipeline,
         rigidbody_set,
     )).unwrap();
+
+    let mut fluids_q = world.query::<(
+        Entity,
+        &FluidPositions,
+        &FluidVelocities,
+        &FluidAccelerations,
+    )>();
+    let salva_ser_data = fluids_q
+        .iter(world)
+        .map(|(entity, pos, vel, acc)| (entity, pos.clone(), vel.clone(), acc.clone()))
+        .collect::<Vec<_>>();
+    world.resource_mut::<ResetSimulationSnapshot>().salva = bincode::serialize(&salva_ser_data)
+        .unwrap();
 }

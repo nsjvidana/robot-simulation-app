@@ -9,7 +9,8 @@ bevy_flycam = "0.15.0"
 bevy_rapier3d = { version = "0.29.0", features = ["serde-serialize", "parallel", "picking-backend", "simd-stable"] }
 rapier3d-urdf = { version = "0.4.0", features = ["stl", "collada", "wavefront"] }
 rapier3d-meshloader = "0.4.0"
-bevy_salva3d = { git = "https://github.com/nsjvidana/bevy_salva.git", rev = "94da339", features = ["rapier", "parallel"] }
+bevy_salva3d = { git = "https://github.com/nsjvidana/bevy_salva.git", rev = "78a0d0f", features = ["rapier", "parallel", "serialize"] }
+#bevy_salva3d = { path = "../bevy_salva/bevy_salva3d", features = ["rapier", "parallel", "serialize"] }
 ncollide3d = "0.33.0"
 openrr-planner = "0.1.0"
 k = "0.32.0"
