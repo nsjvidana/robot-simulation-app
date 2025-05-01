@@ -1,21 +1,30 @@
-use bevy::prelude::{Click, Component, Entity, GlobalTransform, Pointer, Trigger, Visibility};
-use bevy::math::bounding::Aabb3d;
-use bevy::math::{Isometry3d, Vec3};
-use bevy_salva3d::plugin::SalvaPhysicsPlugin;
-use std::sync::Arc;
-use bevy_egui::egui;
-use parking_lot::Mutex;
-use bevy_rapier3d::geometry::{Collider, Sensor};
-use bevy_rapier3d::picking_backend::RapierPickable;
-use bevy_rapier3d::prelude::ColliderDebug;
-use bevy_egui::egui::Ui;
-use bevy_salva3d::utils::cube_particle_positions;
 use crate::ui::properties::{EntityProperty, PropertyFunctionalityResources};
 use crate::ui::toolbar::MovableEntityPickedEvent;
+use crate::prelude::Real;
+use bevy::math::bounding::Aabb3d;
+use bevy::math::{Isometry3d, Vec3};
+use bevy::prelude::{Click, Component, Entity, GlobalTransform, Pointer, Transform, Trigger, Visibility};
+use bevy_egui::egui;
+use bevy_egui::egui::Ui;
+use bevy_rapier3d::geometry::{Collider, Sensor};
+use bevy_rapier3d::picking_backend::RapierPickable;
+use bevy_rapier3d::prelude::{ColliderDebug, ColliderScale};
+use bevy_salva3d::plugin::{AppendNonPressureForces, SalvaPhysicsPlugin};
+use bevy_salva3d::salva::geometry::ParticlesContacts;
+use bevy_salva3d::salva::object::{Boundary, Fluid};
+use bevy_salva3d::salva::solver::{Akinci2013SurfaceTension, ArtificialViscosity, NonPressureForce};
+use bevy_salva3d::salva::TimestepManager;
+use bevy_salva3d::utils::cube_particle_positions;
+use parking_lot::{Mutex, MutexGuard};
+use std::sync::Arc;
+use bevy_salva3d::fluid::FluidNonPressureForces;
 
 pub struct FluidProperty {
     aabb_entities: Option<[FluidBoundEntity; 2]>,
-    aabb_changed: bool
+    aabb_changed: bool,
+    nonpressure_forces: NonpressureForceList,
+    forces_added: bool,
+    npforce_modal_open: bool,
 }
 
 impl FluidProperty {
@@ -23,6 +32,9 @@ impl FluidProperty {
         Self {
             aabb_entities: None,
             aabb_changed: false,
+            nonpressure_forces: NonpressureForceList::new(),
+            npforce_modal_open: false,
+            forces_added: false,
         }
     }
 }
@@ -124,6 +136,55 @@ impl EntityProperty for FluidProperty {
                 self.aabb_changed = true;
             }
         });
+
+        ui.strong("Nonpressure forces:");
+        ui.group(|ui| {
+            let mut forces = self.nonpressure_forces.lock();
+            for f in forces.iter_mut() {
+                ui.collapsing(f.force_name(), |ui| {
+                    f.ui(ui);
+                });
+            }
+        });
+
+        // Nonpressure force modal
+        if ui.button("Add force").clicked() {
+            self.npforce_modal_open = true;
+        }
+        if self.npforce_modal_open {
+            let mut forces = self.nonpressure_forces.lock();
+            let modal = egui::Modal::new(egui::Id::new("np_force_modal"))
+                .show(ui.ctx(), |ui| {
+                    ui.heading("Choose a Nonpressure Force");
+                    let mut force_was_picked = false;
+                    ui.group(|ui| {
+                        if ui.button("Surface Tension").clicked() {
+                            forces.push(Box::new(
+                                Akinci2013SurfaceTensionInterface::new(1., 10.)
+                            ));
+                            force_was_picked = true;
+                        }
+                        if ui.button("Artificial Viscosity").clicked() {
+                            forces.push(Box::new(
+                                ArtificialViscosity::new(0.01, 0.01)
+                            ));
+                            force_was_picked = true;
+                        }
+                        if ui.button("XSPH Viscosity").clicked() {
+                            todo!()
+                        }
+                        if ui.button("Becker Elasticity").clicked() {
+                            todo!()
+                        }
+                    });
+                    if force_was_picked {
+                        self.npforce_modal_open = false;
+                    }
+                });
+            if modal.should_close() {
+                self.npforce_modal_open = false;
+            }
+        }
     }
 
     fn functionality(&mut self, entity: Entity, res: &mut PropertyFunctionalityResources) {
@@ -151,16 +212,32 @@ impl EntityProperty for FluidProperty {
             let r = SalvaPhysicsPlugin::DEFAULT_PARTICLE_RADIUS;
             let diameter = r * 2.;
             let center = (min.pos + max.pos) / 2.;
-            let diagonal = max.pos - min.pos;
-            let x_count =  (diagonal.x.abs() / diameter) as usize;
-            let y_count =  (diagonal.y.abs() / diameter) as usize;
-            let z_count =  (diagonal.z.abs() / diameter) as usize;
+            let diff = max.pos - min.pos;
+            let x_count =  (diff.x.abs() / diameter) as usize;
+            let y_count =  (diff.y.abs() / diameter) as usize;
+            let z_count =  (diff.z.abs() / diameter) as usize;
             let mut positions = cube_particle_positions(x_count, y_count, z_count, r);
                 positions
                     .iter_mut()
                     .for_each(|pos| *pos = *pos + center);
             let mut curr_positions = res.fluids.get_mut(entity).unwrap();
                 **curr_positions = positions;
+
+            let mut coll_trans = res.global_transforms.get_mut(entity).unwrap();
+                *coll_trans = Transform::from(*coll_trans).with_scale(diff).into();
+
+            res.commands.entity(entity)
+                .insert((
+                    ColliderScale::Relative(Vec3::ONE),
+                ));
+        }
+
+        if !self.forces_added {
+            let forces = self.nonpressure_forces.clone();
+            res.commands
+                .entity(entity)
+                .insert(AppendNonPressureForces(vec![Box::new(forces)]));
+            self.forces_added = true;
         }
     }
 
@@ -169,6 +246,10 @@ impl EntityProperty for FluidProperty {
         else { return; };
         res.commands.entity(min.entity).despawn();
         res.commands.entity(max.entity).despawn();
+
+
+        res.commands.entity(entity)
+            .insert(ColliderDebug::NeverRender);
     }
 
     fn property_name(&self) -> &'static str { "Fluid" }
@@ -179,4 +260,150 @@ struct FluidBoundEntity {
     entity: Entity,
     pos: Vec3,
     picked: Arc<Mutex<bool>>
+}
+
+/// List of Nonpressure forces that can be handled by Salva and RobotLab at the same time via Mutex.
+///
+/// This list can be added as a Nonpressure force to a fluid.
+#[derive(Clone)]
+pub struct NonpressureForceList(Arc<Mutex<Vec<Box<dyn NonpressureForceUi>>>>);
+
+impl NonpressureForceList {
+    pub fn new() -> Self {
+        NonpressureForceList(Arc::new(Mutex::new(Vec::new())))
+    }
+
+    pub fn lock(&self) -> MutexGuard<Vec<Box<dyn NonpressureForceUi>>> {
+        self.0.lock()
+    }
+}
+
+impl NonPressureForce for NonpressureForceList {
+    fn solve(
+        &mut self,
+        timestep: &TimestepManager,
+        kernel_radius: Real,
+        fluid_fluid_contacts: &ParticlesContacts,
+        fluid_boundaries_contacts: &ParticlesContacts,
+        fluid: &mut Fluid,
+        boundaries: &[Boundary],
+        densities: &[Real]
+    ) {
+        let mut forces = self.lock();
+        for f in  forces.iter_mut() {
+            f.solve(
+                timestep,
+                kernel_radius,
+                fluid_fluid_contacts,
+                fluid_boundaries_contacts,
+                fluid,
+                boundaries,
+                densities
+            );
+        }
+    }
+
+    fn apply_permutation(&mut self, permutation: &[usize]) {
+        let mut forces = self.lock();
+        for f in forces.iter_mut() {
+            f.apply_permutation(&permutation);
+        }
+    }
+}
+
+macro_rules! display_val {
+    ($ui:expr, $label:expr, $val:expr) => {
+        $ui.horizontal(|ui| {
+            ui.label($label);
+            ui.add(egui::DragValue::new(&mut $val).min_decimals(3).speed(0.1));
+        }).response
+    };
+}
+
+impl NonpressureForceUi for ArtificialViscosity {
+    fn ui(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Alpha: ")
+                .on_hover_text("The coefficient of the linear part of the viscosity.");
+            ui.add(egui::DragValue::new(&mut self.alpha).min_decimals(3).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("Beta: ")
+                .on_hover_text("The coefficient of the quadratic part of the viscosity.");
+            ui.add(egui::DragValue::new(&mut self.beta).min_decimals(3).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("Speed of sound: ")
+                .on_hover_text("The speed of sound within this fluid.");
+            ui.add(egui::DragValue::new(&mut self.speed_of_sound).min_decimals(3).speed(0.1));
+        });
+        display_val!(ui, "Fluid Viscosity Coefficient: ", self.fluid_viscosity_coefficient);
+        display_val!(ui, "Boundary Viscosity Coefficient: ", self.boundary_viscosity_coefficient);
+    }
+
+    fn force_name(&self) -> &'static str { "Artificial Viscosity" }
+}
+
+/// Interface for editing [`Akinci2013SurfaceTension`]
+pub struct Akinci2013SurfaceTensionInterface {
+    force: Akinci2013SurfaceTension,
+    fluid_tension_coefficient: Real,
+    boundary_adhesion_coefficient: Real,
+}
+
+impl Akinci2013SurfaceTensionInterface {
+    pub fn new(fluid_tension_coefficient: Real, boundary_adhesion_coefficient: Real) -> Self {
+        Self {
+            force: Akinci2013SurfaceTension::new(fluid_tension_coefficient, boundary_adhesion_coefficient),
+            fluid_tension_coefficient,
+            boundary_adhesion_coefficient,
+        }
+    }
+}
+
+impl NonPressureForce for Akinci2013SurfaceTensionInterface {
+    fn solve(
+        &mut self,
+        timestep: &TimestepManager,
+        kernel_radius: bevy_salva3d::salva::math::Real,
+        fluid_fluid_contacts: &ParticlesContacts,
+        fluid_boundaries_contacts: &ParticlesContacts,
+        fluid: &mut Fluid,
+        boundaries: &[Boundary],
+        densities: &[bevy_salva3d::salva::math::Real]
+    ) {
+        self.force.solve(
+            timestep,
+            kernel_radius,
+            fluid_fluid_contacts,
+            fluid_boundaries_contacts,
+            fluid,
+            boundaries,
+            densities
+        );
+    }
+
+    fn apply_permutation(&mut self, permutation: &[usize]) {
+        self.force.apply_permutation(permutation);
+    }
+}
+
+impl NonpressureForceUi for Akinci2013SurfaceTensionInterface {
+    fn ui(&mut self, ui: &mut Ui) {
+        let fluid = display_val!(ui, "Fluid  Tension Coefficient: ", self.fluid_tension_coefficient);
+        let boundary = display_val!(ui, "Boundary Adhesion Coefficient: ", self.boundary_adhesion_coefficient);
+
+        if fluid.changed() || boundary.changed() {
+            self.force = Akinci2013SurfaceTension::new(self.fluid_tension_coefficient, self.boundary_adhesion_coefficient);
+        }
+    }
+
+    fn force_name(&self) -> &'static str { "Akinci Surface Tension" }
+}
+
+/// A NonpressureForce that has a Ui for editing the underlying force
+pub trait NonpressureForceUi: NonPressureForce {
+    fn ui(&mut self, ui: &mut Ui);
+
+    fn force_name(&self) -> &'static str;
 }

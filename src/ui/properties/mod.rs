@@ -8,8 +8,8 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_egui::{egui, EguiContexts};
 use std::ops::{Deref, DerefMut};
-use bevy_rapier3d::prelude::{ColliderMassProperties, RigidBody};
-use bevy_salva3d::fluid::FluidPositions;
+use bevy_rapier3d::prelude::{Collider, ColliderMassProperties, RigidBody};
+use bevy_salva3d::fluid::{FluidPositions, SalvaFluidHandle};
 use crate::ui::selecting::SceneWindowData;
 
 pub fn build_app(app: &mut App) {
@@ -100,6 +100,7 @@ pub trait EntityProperty: Send + Sync {
 #[derive(SystemParam)]
 pub struct PropertyFunctionalityResources<'w, 's> {
     pub bodies: Query<'w, 's, &'static mut RigidBody>,
+    pub colliders: Query<'w, 's, &'static mut Collider>,
     pub mass_properties: Query<'w, 's, &'static mut ColliderMassProperties>,
     pub fluids: Query<'w, 's, &'static mut FluidPositions>,
     pub global_transforms: Query<'w, 's, &'static mut GlobalTransform>,

@@ -1,21 +1,15 @@
 use crate::error::ErrorEvent;
 use crate::functionality::RobotLabPlugin;
 use crate::ui::selecting::PickingExt;
-use crate::ui::{RobotLabUiPlugin, VisualEntity};
+use crate::ui::RobotLabUiPlugin;
 use bevy::prelude::*;
 use bevy::DefaultPlugins;
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier3d::dynamics::RigidBody;
-use bevy_rapier3d::geometry::Collider;
 use bevy_rapier3d::prelude::RapierPickable;
-use bevy_salva3d::fluid::{FluidNonPressureForces, FluidPositions};
-use bevy_salva3d::plugin::SalvaPhysicsPlugin;
-use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSampling};
-use bevy_salva3d::salva::solver::{Akinci2013SurfaceTension, ArtificialViscosity};
-use bevy_salva3d::utils::cube_particle_positions;
-use crate::ui::generic_object::GenericObject;
+use bevy_salva3d::fluid::FluidPositions;
+use bevy_salva3d::plugin::{ReadDefaultSalvaContext, SalvaPhysicsPlugin};
 
 pub mod ui;
 pub mod functionality;

@@ -1,6 +1,7 @@
 use bevy::app::App;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::SystemState;
+use bevy::math::bounding::{Aabb3d, BoundingVolume};
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::systems::{writeback_rigid_bodies, RigidBodyWritebackComponents};
 use bevy_rapier3d::prelude::*;
@@ -309,15 +310,15 @@ fn on_exit_reset(world: &mut World) {
 pub fn update_fluid_entity_positions(
     mut fluid_positions: Query<(&mut FluidPositions, &mut GlobalTransform)>,
 ) {
-    // for (positions, mut transform) in fluid_positions.iter_mut() {
-    //     if positions.is_empty() { continue; };
-    //     let center = Aabb3d::from_point_cloud(
-    //         Isometry3d::IDENTITY,
-    //         positions
-    //             .iter()
-    //             .copied()
-    //     )
-    //         .center();
-    //     *transform = GlobalTransform::from_translation(center.into());
-    // }
+    for (positions, mut transform) in fluid_positions.iter_mut() {
+        if positions.is_empty() { continue; };
+        let center = Aabb3d::from_point_cloud(
+            Isometry3d::IDENTITY,
+            positions
+                .iter()
+                .copied()
+        )
+            .center();
+        *transform = GlobalTransform::from_translation(center.into());
+    }
 }

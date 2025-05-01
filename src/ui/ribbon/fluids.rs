@@ -10,6 +10,8 @@ use bevy_rapier3d::prelude::{Collider, Sensor};
 use bevy_salva3d::fluid::FluidPositions;
 use bevy_salva3d::plugin::SalvaPhysicsPlugin;
 use bevy_salva3d::utils::cube_particle_positions;
+use crate::ui::properties::fluid_prop::FluidProperty;
+
 pub fn build_app(app: &mut App) {
     app.init_resource::<FluidSelection>();
 
@@ -27,11 +29,7 @@ impl View for FluidsUi {
             commands.spawn((
                 Transform::default(),
                 FluidPositions(cube_particle_positions(half_size, half_size, half_size, r)),
-                Collider::cuboid(
-                    half_size as Real * r, 
-                    half_size as Real * r, 
-                    half_size as Real * r
-                ),
+                Collider::cuboid(0.5, 0.5, 0.5),
                 Sensor,
             ))
                 .insert_entity_properties(box_vec![FluidProperty::new()])
