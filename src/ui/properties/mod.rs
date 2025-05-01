@@ -1,9 +1,12 @@
+pub mod physics_property;
+
 use crate::ui::{RobotLabUiSet, View};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_egui::{egui, EguiContexts};
 use std::ops::{Deref, DerefMut};
+use bevy_rapier3d::prelude::{ColliderMassProperties, MassProperties, RigidBody};
 use bevy_salva3d::fluid::FluidPositions;
 use crate::ui::selecting::SceneWindowData;
 
@@ -138,6 +141,8 @@ pub trait EntityProperty: Send + Sync {
 
 #[derive(SystemParam)]
 pub struct PropertyFunctionalityResources<'w, 's> {
+    pub bodies: Query<'w, 's, &'static mut RigidBody>,
+    pub mass_properties: Query<'w, 's, &'static mut ColliderMassProperties>,
     pub fluids: Query<'w, 's, &'static mut FluidPositions>,
     pub global_transforms: Query<'w, 's, &'static mut GlobalTransform>,
     pub local_transforms: Query<'w, 's, &'static mut Transform>,

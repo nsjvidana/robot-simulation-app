@@ -1,6 +1,6 @@
 use crate::box_vec;
 use crate::ui::selecting::{MakeSelectionsSet, PickingRequest, PickingRequestCommandExt, PickingResponse};
-use crate::ui::toolbar::ToolbarWindow;
+use crate::ui::toolbar::{MovableEntityPickedEvent, ToolbarWindow};
 use bevy::prelude::*;
 use crate::ui::properties::PropertiesSelectionEvent;
 
@@ -51,10 +51,6 @@ pub fn select_generic_objects(
             entity,
             name: name.to_string(),
         });
-        toolbar_window.active_movable_entity = Some(entity);
-    }
-
-    if selection.picking_resp.unpicked() {
-        toolbar_window.active_movable_entity = None;
+        commands.send_event(MovableEntityPickedEvent(entity));
     }
 }

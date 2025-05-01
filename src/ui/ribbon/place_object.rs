@@ -5,10 +5,12 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
+use bevy_rapier3d::prelude::{ColliderMassProperties, MassProperties};
 use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSampling};
 use crate::box_vec;
 use crate::functionality::simulation::SimulationState;
 use crate::ui::properties::{EntityPropertiesExt, TransformProperty};
+use crate::ui::properties::physics_property::PhysicsProperty;
 
 #[derive(Default)]
 pub struct PlaceObjectUi {
@@ -46,11 +48,13 @@ impl View for PlaceObjectUi {
         }
 
         if self.cuboid {
+            let coll = Collider::cuboid(0.5, 0.5, 0.5);
             commands
                 .spawn((
                     Name::new("Cuboid"),
                     RigidBody::Dynamic,
-                    Collider::cuboid(0.5, 0.5, 0.5),
+                    ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
+                    coll,
                     InheritedVisibility::default(),
                     VisualEntity,
                     Mesh3d(meshes.add(Cuboid::new(1., 1., 1.))),
@@ -58,52 +62,70 @@ impl View for PlaceObjectUi {
                     GenericObject,
                     RapierColliderSampling::DynamicContact
                 ))
-                .insert_entity_properties(box_vec![TransformProperty::new()])
+                .insert_entity_properties(box_vec![
+                    TransformProperty::new(),
+                    PhysicsProperty::new()
+                ])
                 .make_entity_pickable();
         }
         if self.ball {
+            let coll = Collider::ball(0.5);
             commands
                 .spawn((
                     Name::new("Ball"),
                     RigidBody::Dynamic,
-                    Collider::ball(0.5),
+                    ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
+                    coll,
                     InheritedVisibility::default(),
                     VisualEntity,
                     Mesh3d(meshes.add(Sphere::new(0.5))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
-                .insert_entity_properties(box_vec![TransformProperty::new()])
+                .insert_entity_properties(box_vec![
+                    TransformProperty::new(),
+                    PhysicsProperty::new()
+                ])
                 .make_entity_pickable();
         }
         if self.cone {
+            let coll = Collider::cone(0.5, 0.5);
             commands
                 .spawn((
                     Name::new("Cone"),
                     RigidBody::Dynamic,
-                    Collider::cone(0.5, 0.5),
+                    ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
+                    coll,
                     InheritedVisibility::default(),
                     VisualEntity,
                     Mesh3d(meshes.add(Cone::new(0.5, 1.))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
-                .insert_entity_properties(box_vec![TransformProperty::new()])
+                .insert_entity_properties(box_vec![
+                    TransformProperty::new(),
+                    PhysicsProperty::new()
+                ])
                 .make_entity_pickable();
         }
         if self.cylinder {
+            let coll = Collider::cylinder(0.5, 0.5);
             commands
                 .spawn((
                     Name::new("Cylinder"),
                     RigidBody::Dynamic,
-                    Collider::cylinder(0.5, 0.5),
+                    ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
+                    coll,
                     InheritedVisibility::default(),
                     VisualEntity,
                     Mesh3d(meshes.add(Cylinder::new(0.5, 1.))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
-                .insert_entity_properties(box_vec![TransformProperty::new()])
+                .insert_entity_properties(box_vec![
+                    TransformProperty::new(),
+                    PhysicsProperty::new()
+                ])
                 .make_entity_pickable();
         }
 
