@@ -16,6 +16,7 @@ pub struct ImportEvent {
     pub approximate_collisions: bool,
     pub convex_decomp_options: VHACDParameters,
     pub all_joints_have_motors: bool,
+    pub sampling_meth
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
