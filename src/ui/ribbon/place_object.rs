@@ -49,7 +49,7 @@ impl View for PlaceObjectUi {
             commands
                 .spawn((
                     Name::new("Cuboid"),
-                    RigidBody::Fixed,
+                    RigidBody::Dynamic,
                     Collider::cuboid(0.5, 0.5, 0.5),
                     InheritedVisibility::default(),
                     VisualEntity,
