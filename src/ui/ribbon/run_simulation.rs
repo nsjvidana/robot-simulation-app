@@ -98,12 +98,24 @@ impl View for RunSimulationUi {
                     TimestepMode::Variable { max_dt,.. } => *max_dt = new_dt,
                     TimestepMode::Interpolated { dt,.. } => *dt = new_dt,
                 }
+
+                match &mut *res.salva_timestep  {
+                    bevy_salva3d::plugin::TimestepMode::Fixed { dt, .. } => *dt = new_dt,
+                    bevy_salva3d::plugin::TimestepMode::Variable { max_dt,.. } => *max_dt = new_dt,
+                    bevy_salva3d::plugin::TimestepMode::Interpolated { dt,.. } => *dt = new_dt,
+                }
             }
             else if substeps.changed() {
                 match &mut *res.timestep_mode {
                     TimestepMode::Fixed { substeps, .. } => *substeps = window.substeps,
                     TimestepMode::Variable { substeps,.. } => *substeps = window.substeps,
                     TimestepMode::Interpolated { substeps,.. } => *substeps = window.substeps,
+                }
+
+                match &mut *res.salva_timestep  {
+                    bevy_salva3d::plugin::TimestepMode::Fixed { substeps, .. } => *substeps = window.substeps,
+                    bevy_salva3d::plugin::TimestepMode::Variable { substeps,.. } => *substeps = window.substeps,
+                    bevy_salva3d::plugin::TimestepMode::Interpolated { substeps,.. } => *substeps = window.substeps,
                 }
             }
             else if fps.changed() {

@@ -4,8 +4,6 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_egui::{egui, EguiContexts};
 use std::ops::{Deref, DerefMut};
-use bevy_salva3d::fluid::FluidPositions;
-use crate::ui::selecting::SceneWindowData;
 
 pub fn build_app(app: &mut App) {
     app.init_resource::<Events<PropertiesSelectionEvent>>();
@@ -13,43 +11,7 @@ pub fn build_app(app: &mut App) {
 
     app.add_systems(Update, props_prepare.in_set(RobotLabUiSet::Prepare));
 
-    app.add_systems(Update,
-        (
-            props_ui_system.in_set(RobotLabUiSet::Ui),
-            props_functionality_system.in_set(RobotLabUiSet::Functionality)
-        )
-    );
-}
-
-pub struct AddEntityPropertiesCommand {
-    props: Vec<Box<dyn EntityProperty>>,
-}
-
-impl EntityCommand for AddEntityPropertiesCommand {
-    fn apply(self, entity: Entity, world: &mut World) {
-        let props = world.query::<&mut EntityProperties>()
-            .get_mut(world, entity);
-        if let Ok(mut props) = props {
-            let mut ps = self.props;
-            props.append(&mut ps);
-        }
-        else {
-            world.entity_mut(entity).insert(EntityProperties(self.props));
-        }
-    }
-}
-
-pub trait EntityPropertiesExt {
-    fn insert_entity_properties(&mut self, props: Vec<Box<dyn EntityProperty>>) -> &mut Self;
-}
-
-impl<'a, 's> EntityPropertiesExt for EntityCommands<'a> {
-    fn insert_entity_properties(&mut self, props: Vec<Box<dyn EntityProperty>>) -> &mut Self {
-        self.queue(AddEntityPropertiesCommand {
-            props,
-        });
-        self
-    }
+    app.add_systems(Update, props_ui_system.in_set(RobotLabUiSet::Ui));
 }
 
 #[derive(Component)]
@@ -70,18 +32,9 @@ pub struct TransformProperty {
     pub scaling_options: Option<ScalingOptions>,
 }
 
-impl TransformProperty {
-    pub fn new() -> Self {
-        Self {
-            transform: Transform::IDENTITY,
-            scaling_options: None,
-        }
-    }
-}
-
 impl EntityProperty for TransformProperty {
     fn prepare(&mut self, entity: Entity, res: &mut PropertyFunctionalityResources) {
-        self.transform = Transform::from(*res.global_transforms.get(entity).unwrap());
+        self.transform = *res.local_transforms.get(entity).unwrap();
     }
 
     fn ui(&mut self, ui: &mut Ui) {
@@ -138,13 +91,9 @@ pub trait EntityProperty: Send + Sync {
 
 #[derive(SystemParam)]
 pub struct PropertyFunctionalityResources<'w, 's> {
-    pub fluids: Query<'w, 's, &'static mut FluidPositions>,
     pub global_transforms: Query<'w, 's, &'static mut GlobalTransform>,
     pub local_transforms: Query<'w, 's, &'static mut Transform>,
     pub keyboard: Res<'w, ButtonInput<KeyCode>>,
-    pub mouse: Res<'w, ButtonInput<MouseButton>>,
-    pub scene_window_data: Res<'w, SceneWindowData>,
-    pub commands: Commands<'w, 's>,
 }
 
 #[derive(Event)]
@@ -160,15 +109,24 @@ pub struct PropertiesUi {
 }
 
 impl PropertiesUi {
-    pub fn prepare(&mut self, entity_props: &mut Query<&mut EntityProperties>, res: &mut PropertyFunctionalityResources) {
-        if !self.panel_open {
-            return;
+    fn set_entity(
+        &mut self,
+        name: String,
+        entity: Entity,
+        entity_props: &mut Query<&mut EntityProperties>,
+        res: &mut PropertyFunctionalityResources
+    ) -> &mut Self {
+        // First cleanup current properties, if any.
+        if let Some((_, entity)) = self.entity.take() {
+            let mut props = entity_props.get_mut(entity).unwrap();
+            for p in props.iter_mut() {
+                p.cleanup(entity, res);
+            }
         }
-        let Some((_, entity)) = self.entity else { return; };
-        let mut props = entity_props.get_mut(entity).unwrap();
-        for p in props.iter_mut() {
-            p.prepare(entity, res);
-        }
+
+        // then set entity.
+        self.entity = Some((name, entity));
+        self
     }
 
     pub fn panel_ui(
@@ -203,40 +161,12 @@ impl PropertiesUi {
     pub fn functionality(&mut self, entity_props: &mut Query<&mut EntityProperties>, res: &mut PropertyFunctionalityResources) {
         if res.keyboard.just_pressed(KeyCode::KeyN) {
             self.panel_open = !self.panel_open;
-            // Cleanup when closing panel
-            if !self.panel_open && self.entity.is_some() {
-                self.cleanup(entity_props, res);
-            }
         }
-        if !self.panel_open { return; }
 
         let Some((_, entity)) = self.entity else { return; };
         let mut properties = entity_props.get_mut(entity).unwrap();
         for p in properties.iter_mut() {
             p.functionality(entity, res);
-        }
-    }
-
-    fn set_entity(
-        &mut self,
-        name: String,
-        entity: Entity,
-        entity_props: &mut Query<&mut EntityProperties>,
-        res: &mut PropertyFunctionalityResources
-    ) -> &mut Self {
-        // First cleanup current properties, if any,
-        self.cleanup(entity_props, res);
-        // then set entity.
-        self.entity = Some((name, entity));
-        self
-    }
-
-    fn cleanup(&mut self, entity_props: &mut Query<&mut EntityProperties>, res: &mut PropertyFunctionalityResources) {
-        if let Some((_, entity)) = self.entity {
-            let mut props = entity_props.get_mut(entity).unwrap();
-            for p in props.iter_mut() {
-                p.cleanup(entity, res);
-            }
         }
     }
 }
@@ -255,8 +185,6 @@ pub fn props_prepare(
             &mut props_res
         );
     }
-    // Call prepare() on properties
-    props_ui.prepare(&mut entity_props, &mut props_res);
 }
 
 pub fn props_ui_system(
@@ -273,11 +201,4 @@ pub fn props_functionality_system(
     mut entity_props: Query<&mut EntityProperties>,
 ) {
     props_ui.functionality(&mut entity_props, &mut props_res);
-}
-
-#[macro_export]
-macro_rules! box_vec {
-    ($($rest:expr),+) => {
-        vec![$(Box::new($rest)),+]
-    };
 }

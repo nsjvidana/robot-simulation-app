@@ -4,7 +4,7 @@ use bevy::math::{EulerRot, Quat};
 use bevy::prelude::{Commands, Entity, Transform, Vec3};
 use bevy_egui::egui;
 use bevy_egui::egui::Ui;
-use bevy_rapier3d::prelude::{ColliderDebug, ColliderScale};
+use bevy_rapier3d::prelude::ColliderScale;
 
 pub struct TransformProperty {
     pub entity: Entity,
@@ -31,13 +31,14 @@ impl TransformProperty {
 }
 
 impl View for TransformProperty {
-    fn prepare(&mut self, res: &mut FunctionalUiResources) {
+    fn prepare(&mut self, res: &mut FunctionalUiResources) -> crate::prelude::Result<()> {
         let TransformProperty { entity, transform, ..} = self;
         let scale = transform.scale;
         let mut curr_trans = res.transforms.get_mut(*entity).unwrap();
         *transform = Transform::from(*curr_trans);
         // Conserve scale
         transform.scale = scale;
+        Ok(())
     }
 
     fn ui(&mut self, ui: &mut Ui, _commands: &mut Commands) {
@@ -149,6 +150,10 @@ impl View for TransformProperty {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn cleanup(&mut self, _functional_resources: &mut FunctionalUiResources) -> crate::prelude::Result<()> {
         Ok(())
     }
 }

@@ -1,14 +1,17 @@
-use bevy::prelude::*;
-use crate::entity_properties;
-use crate::ui::properties::PropertiesUi;
-use crate::ui::properties::transform_prop::TransformProperty;
+use crate::box_vec;
 use crate::ui::selecting::{MakeSelectionsSet, PickingRequest, PickingRequestCommandExt, PickingResponse};
 use crate::ui::toolbar::ToolbarWindow;
+use bevy::prelude::*;
+use crate::ui::properties::PropertiesSelectionEvent;
 
 pub fn build_app(app: &mut App) {
     app.init_resource::<GenericObjSelection>();
 
-    app.add_systems(Update, select_generic_objects.in_set(MakeSelectionsSet));
+    app.add_systems(
+        Update,
+        select_generic_objects
+            .in_set(MakeSelectionsSet)
+    );
 }
 
 #[derive(Component)]
@@ -35,26 +38,23 @@ impl FromWorld for GenericObjSelection {
 
 pub fn select_generic_objects(
     selection: ResMut<GenericObjSelection>,
-    mut properties_ui: ResMut<PropertiesUi>,
     mut toolbar_window: ResMut<ToolbarWindow>,
-    generic_objs: Query<(&Name, &GlobalTransform), With<GenericObject>>,
+    obj_names: Query<&Name, With<GenericObject>>,
+    mut commands: Commands,
 ) {
     if let Some(entity) = selection.picking_resp
         .take_response()
         .map(|v| v.event.entity)
     {
-        let (name, transform) = generic_objs.get(entity).unwrap();
-        properties_ui.entity_properties = Some(entity_properties!(
-            name.to_string(),
-            TransformProperty::new(entity, (*transform).into())
-                .edit_scale(true)
-        ));
+        let name = obj_names.get(entity).unwrap();
+        commands.send_event(PropertiesSelectionEvent {
+            entity,
+            name: name.to_string(),
+        });
         toolbar_window.active_movable_entity = Some(entity);
     }
 
     if selection.picking_resp.unpicked() {
-        selection.picking_resp.reset_unpicked();
         toolbar_window.active_movable_entity = None;
-        properties_ui.entity_properties = None;
     }
 }

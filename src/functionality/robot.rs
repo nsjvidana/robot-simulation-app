@@ -18,6 +18,7 @@ use bevy_rapier3d::rapier;
 use bevy_rapier3d::rapier::data::{Arena, Index};
 use bevy_rapier3d::rapier::prelude::SPATIAL_DIM;
 use bevy_rapier3d::utils::iso_to_transform;
+use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSampling};
 use rapier3d_urdf::{UrdfJoint, UrdfJointHandle, UrdfLink, UrdfLoaderOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
 use urdf_rs::{Geometry, Inertial, Joint, Pose};
@@ -519,6 +520,9 @@ fn create_rapier_robot_entities(
                 collider_components(coll, coll_handle),
                 RobotPart(robot_entity),
                 *context_link,
+                RapierColliderSampling {
+                    sampling_method: ColliderSamplingMethod::DynamicContact
+                }
             ))
                 .id();
             coll.user_data = coll_e.to_bits() as u128;

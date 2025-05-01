@@ -8,14 +8,15 @@ use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{ImpulseJoint, MultibodyJoint, RapierPickable};
 use parking_lot::Mutex;
 use std::sync::Arc;
+use bevy_salva3d::fluid::FluidPositions;
 
 pub fn build_app(app: &mut App) {
-    app.add_event::<PickingEvent>();
-
     app.init_non_send_resource::<PickingServer>();
 
     app
-        .init_resource::<SceneWindowData>();
+        .init_resource::<SceneWindowData>()
+        .init_resource::<Events<PickingEvent>>()
+        .init_resource::<Events<UnpickEvent>>();
 
     app.configure_sets(
         Update,
@@ -45,6 +46,7 @@ pub struct MakeSelectionsSet;
 pub struct SceneWindowData {
     pub viewport_to_world_ray: Option<Ray3d>,
     pub viewport_clicked: bool,
+    pub viewport_contains_pointer: bool,
 }
 
 #[derive(SystemParam)]
@@ -55,6 +57,7 @@ pub struct PickingFilterResources<'w, 's> {
     pub robot_parts: Query<'w, 's, &'static RobotPart>,
     pub generic_objects: Query<'w, 's, (), With<GenericObject>>,
     pub selections: Res<'w, RobotSelection>,
+    pub fluids: Query<'w, 's, &'static FluidPositions>,
 }
 
 #[derive(Event, Debug, Clone)]
@@ -62,6 +65,9 @@ pub struct PickingEvent {
     pub pointer_event: Pointer<Click>,
     pub entity: Entity,
 }
+
+#[derive(Event, Debug, Clone)]
+pub struct UnpickEvent;
 
 #[derive(Default)]
 pub struct PickingServer {
@@ -243,21 +249,14 @@ pub trait PickingExt {
 
 pub fn selections_system(
     mut picking_server: NonSendMut<PickingServer>,
-    mut picking_events: Res<Events<PickingEvent>>,
+    mut picking_events: ResMut<Events<PickingEvent>>,
+    mut unpick_events: ResMut<Events<UnpickEvent>>,
     picking_filter_resources: PickingFilterResources,
     scene_window_data: Res<SceneWindowData>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
 ) {
     let mut entity_was_picked = false;
-    let mut add_back_request = false;
-
-    let mut requests = Vec::new();
-        requests.append(&mut picking_server.requests);
-    for request in requests {
-        if !*request.resp.canceled.lock() {
-            picking_server.requests.push(request);
-        }
-    }
 
     let mut requests = Vec::with_capacity(picking_server.requests.len());
     loop {
@@ -291,7 +290,28 @@ pub fn selections_system(
     requests.reverse();
     picking_server.requests.append(&mut requests);
 
-    if scene_window_data.viewport_clicked && !entity_was_picked {
+    let mut requests = Vec::new();
+    requests.append(&mut picking_server.requests);
+    for request in requests {
+        if !*request.resp.canceled.lock() {
+            picking_server.requests.push(request);
+        }
+    }
+
+    // Reset unpicked state if the previous frame had unpick events.
+    if !unpick_events.is_empty() {
+        for request in &mut picking_server.requests {
+            request.resp.reset_unpicked();
+        }
+    }
+    unpick_events.clear();
+    unpick_events.update();
+
+    if scene_window_data.viewport_contains_pointer &&
+        mouse.just_released(MouseButton::Left) &&
+        !entity_was_picked
+    {
+        unpick_events.send(UnpickEvent);
         let mut requests = Vec::with_capacity(picking_server.requests.len());
         loop {
             if let Some(request) = picking_server.requests.pop() {
@@ -311,6 +331,11 @@ pub fn selections_system(
         requests.reverse();
         picking_server.requests.append(&mut requests);
     }
+
+    //Wipe events for next frame
+    picking_events.update();
+    picking_events.clear();
+
     // TODO: implement deleting robots.
 }
 
@@ -325,6 +350,7 @@ pub fn update_scene_window_data(
     scene_window_data.viewport_to_world_ray = window
         .cursor_position()
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok());
+    scene_window_data.viewport_contains_pointer = !egui_ctxs.ctx_mut().is_pointer_over_area();
     scene_window_data.viewport_clicked = mouse.just_released(MouseButton::Left) &&
-        !egui_ctxs.ctx_mut().is_pointer_over_area();
+        scene_window_data.viewport_contains_pointer;
 }

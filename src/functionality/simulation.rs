@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use bevy::app::App;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::SystemState;
@@ -7,7 +6,6 @@ use bevy_rapier3d::plugin::systems::{writeback_rigid_bodies, RigidBodyWritebackC
 use bevy_rapier3d::prelude::*;
 use bevy_salva3d::fluid::{FluidAccelerations, FluidPositions, FluidVelocities};
 use bevy_salva3d::plugin::{DefaultSalvaContext, SalvaConfiguration, SalvaPhysicsPlugin};
-use crate::functionality::robot::RobotLinks;
 
 pub fn build_plugin(app: &mut App) {
     app.insert_resource(Time::<Fixed>::from_hz(60.));
@@ -49,7 +47,11 @@ pub fn build_plugin(app: &mut App) {
 
     app.add_systems(
         PostUpdate,
-        simulation_runner
+        (
+            update_fluid_entity_positions,
+            simulation_runner
+        )
+            .chain()
     );
 }
 
@@ -298,4 +300,20 @@ fn on_exit_reset(world: &mut World) {
         .collect::<Vec<_>>();
     world.resource_mut::<ResetSimulationSnapshot>().salva = bincode::serialize(&salva_ser_data)
         .unwrap();
+}
+
+pub fn update_fluid_entity_positions(
+    mut fluid_positions: Query<(&mut FluidPositions, &mut GlobalTransform)>,
+) {
+    // for (positions, mut transform) in fluid_positions.iter_mut() {
+    //     if positions.is_empty() { continue; };
+    //     let center = Aabb3d::from_point_cloud(
+    //         Isometry3d::IDENTITY,
+    //         positions
+    //             .iter()
+    //             .copied()
+    //     )
+    //         .center();
+    //     *transform = GlobalTransform::from_translation(center.into());
+    // }
 }

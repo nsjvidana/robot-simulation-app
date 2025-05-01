@@ -5,7 +5,10 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
+use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSampling};
+use crate::box_vec;
 use crate::functionality::simulation::SimulationState;
+use crate::ui::properties::{EntityPropertiesExt, TransformProperty};
 
 #[derive(Default)]
 pub struct PlaceObjectUi {
@@ -46,14 +49,18 @@ impl View for PlaceObjectUi {
             commands
                 .spawn((
                     Name::new("Cuboid"),
-                    RigidBody::Dynamic,
+                    RigidBody::Fixed,
                     Collider::cuboid(0.5, 0.5, 0.5),
                     InheritedVisibility::default(),
                     VisualEntity,
                     Mesh3d(meshes.add(Cuboid::new(1., 1., 1.))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
+                    RapierColliderSampling {
+                        sampling_method: ColliderSamplingMethod::DynamicContact
+                    }
                 ))
+                .insert_entity_properties(box_vec![TransformProperty::new()])
                 .make_entity_pickable();
         }
         if self.ball {
@@ -68,6 +75,7 @@ impl View for PlaceObjectUi {
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
+                .insert_entity_properties(box_vec![TransformProperty::new()])
                 .make_entity_pickable();
         }
         if self.cone {
@@ -82,6 +90,7 @@ impl View for PlaceObjectUi {
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
+                .insert_entity_properties(box_vec![TransformProperty::new()])
                 .make_entity_pickable();
         }
         if self.cylinder {
@@ -96,6 +105,7 @@ impl View for PlaceObjectUi {
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
                 ))
+                .insert_entity_properties(box_vec![TransformProperty::new()])
                 .make_entity_pickable();
         }
 

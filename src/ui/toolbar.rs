@@ -13,6 +13,8 @@ use std::ops::Mul;
 pub fn build_app(app: &mut App) {
     app.init_resource::<ToolbarWindow>();
 
+    app.add_event::<MovableEntityPickedEvent>();
+
     app.add_systems(
         Update,
         (
@@ -65,6 +67,9 @@ impl View for ToolbarWindow {
 
 impl GizmosUi for ToolbarWindow {
     fn gizmos_ui(&mut self, resources: &mut GizmosUiResources) {
+        for event in resources.movable_entity_picked.drain() {
+            self.active_movable_entity = Some(event.0);
+        }
         self.position_tool.set_active_movable_entity(self.active_movable_entity.clone());
         match &mut self.position_tool {
             PositionTool::Translate(tool) => {
@@ -129,16 +134,16 @@ impl TranslateTool {
         } = functional_ui_resources;
         
         let cam_trans = camera_query_data.transform;
-        let Some((gizmo_origin, mut entity_transform)) = self.active_movable_entity
-            .map(|entity| {
-                let entity_trans = transforms.get_mut(entity).unwrap();
-                let cam_pos = cam_trans.translation();
-                let cam_to_entity = (entity_trans.translation() - cam_pos)
-                    .normalize()
-                    .mul(GIZMO_DISTANCE);
-                (Vector3::from(cam_pos + cam_to_entity), entity_trans)
-            })
-        else { return; };
+        let Some(active_movable_entity) = self.active_movable_entity else { return; };
+            if !transforms.contains(active_movable_entity) { return; }
+        let (gizmo_origin, mut entity_transform) = {
+            let entity_trans = transforms.get_mut(active_movable_entity).unwrap();
+            let cam_pos = cam_trans.translation();
+            let cam_to_entity = (entity_trans.translation() - cam_pos)
+                .normalize()
+                .mul(GIZMO_DISTANCE);
+            (Vector3::from(cam_pos + cam_to_entity), entity_trans)
+        };
         let entity_iso = Isometry3 {
             translation: entity_transform.translation().into(),
             rotation: entity_transform.rotation().into(),
@@ -189,7 +194,7 @@ impl TranslateTool {
                 self.grabbed_axis_normal_world_idx = Some(worldspace_normal_idx);
                 self.init_click = compute_plane_intersection_pos(&ray, &gizmo_origin, &worldspace_normal);
                 self.selection_blocking_resp = Some(
-                    commands.send_picking_request(PickingRequest::new(|_, _| false))
+                    commands.send_picking_request(PickingRequest::new(|_, _| true).continuous(true))
                 );
             }
         }
@@ -243,7 +248,7 @@ impl TranslateTool {
     pub fn draw(&self, res: &mut GizmosUiResources) {
         let Some(entity_e) = self.active_movable_entity else { return; };
         let cam_trans = *res.camera.transform;
-        let entity_trans = *res.transforms.get(entity_e).unwrap();
+        let Ok(entity_trans) = res.transforms.get(entity_e).cloned() else { return; };
         let gizmos = &mut res.gizmos;
         let [x, y, z] = self.worldspace_axes;
 
@@ -409,7 +414,7 @@ impl RotateTool {
                     &worldspace_normal
                 );
                 self.ring_normal_idx = Some(min_idx);
-                self.selection_blocking_resp = Some(commands.send_picking_request(PickingRequest::new(|_,_| false)));
+                self.selection_blocking_resp = Some(commands.send_picking_request(PickingRequest::new(|_,_| true).continuous(true)));
             }
         }
         else if mouse.pressed(MouseButton::Left) {
@@ -546,6 +551,9 @@ impl Default for RotateTool {
         }
     }
 }
+
+#[derive(Event)]
+pub struct MovableEntityPickedEvent(pub Entity);
 
 pub fn toolbar_ui_system(
     mut toolbar_window: ResMut<ToolbarWindow>,

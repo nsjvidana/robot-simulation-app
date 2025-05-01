@@ -1,10 +1,8 @@
 use crate::functionality::robot::{RobotEntity, RobotPart};
+use crate::ui::properties::PropertiesSelectionEvent;
 use crate::ui::selecting::{MakeSelectionsSet, PickingExt, PickingRequest, PickingRequestCommandExt, PickingResponse, SelectingSet};
 use crate::ui::toolbar::ToolbarWindow;
 use bevy::prelude::*;
-use crate::entity_properties;
-use crate::ui::properties::PropertiesUi;
-use crate::ui::properties::transform_prop::TransformProperty;
 
 pub fn build_app(app: &mut App) {
     let robot_selection = RobotSelection::from_world(app.world_mut());
@@ -56,9 +54,9 @@ impl FromWorld for RobotSelection {
 pub fn select_robots(
     mut selections: ResMut<RobotSelection>,
     robot_parts: Query<&RobotPart>,
-    robots: Query<(&GlobalTransform, &RobotEntity)>,
+    robots: Query<&RobotEntity>,
     mut toolbar_window: ResMut<ToolbarWindow>,
-    mut properties_ui: ResMut<PropertiesUi>,
+    mut commands: Commands
 ) {
     if let Some(resp) = selections.robot_picking_resp.take_response() {
         if let Ok(robot_e) = robot_parts
@@ -67,11 +65,11 @@ pub fn select_robots(
         {
             selections.active_robot = Some(robot_e);
             toolbar_window.active_movable_entity = Some(robot_e);
-            let (trans, robot) = robots.get(robot_e).unwrap();
-            properties_ui.entity_properties = Some(entity_properties!(
-                robot.urdf.name.clone(),
-                TransformProperty::new(robot_e, (*trans).into())
-            ));
+            let robot = robots.get(robot_e).unwrap();
+            commands.send_event(PropertiesSelectionEvent {
+                entity: robot_e,
+                name: robot.urdf.name.clone()
+            });
             if !resp.shift_click {
                 selections.selected_robots.clear();
             }
@@ -80,10 +78,8 @@ pub fn select_robots(
     }
 
     if selections.robot_picking_resp.unpicked() {
-        selections.robot_picking_resp.reset_unpicked();
         selections.active_robot = None;
         toolbar_window.active_movable_entity = None;
-        properties_ui.entity_properties = None;
         selections.selected_robots.clear();
     }
 }

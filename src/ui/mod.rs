@@ -4,8 +4,8 @@ use crate::functionality::robot::{KinematicNode, RobotEntity, RobotMaterials, Ro
 use crate::functionality::simulation::SimulationState;
 use crate::prelude::*;
 use crate::ui::ribbon::motion_planning::ik::IkWindow;
-use crate::ui::ribbon::Ribbon;
-use crate::ui::selecting::SceneWindowData;
+use crate::ui::ribbon::{fluids, Ribbon};
+use crate::ui::selecting::{SceneWindowData, UnpickEvent};
 use bevy::app::App;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -13,6 +13,7 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_rapier3d::prelude::{Collider, ColliderDebug, DefaultRapierContext, ImpulseJoint, MultibodyJoint, RapierConfiguration, RapierDebugRenderPlugin, RapierPickingPlugin, RapierPickingSettings, TimestepMode, WriteRapierContext};
 use std::ops::{Deref, DerefMut};
 use bevy::ecs::query::QueryData;
+use bevy_salva3d::fluid::FluidPositions;
 
 pub mod toolbar;
 pub mod ribbon;
@@ -112,6 +113,7 @@ impl Plugin for RobotLabUiPlugin {
         ribbon::motion_planning::build_app(app);
         toolbar::build_app(app);
         properties::build_app(app);
+        fluids::build_app(app);
     }
 }
 
@@ -187,15 +189,23 @@ pub struct FunctionalUiResources<'w, 's> {
     pub multibody_q: Query<'w, 's, &'static MultibodyJoint>,
     pub impulse_joint_q: Query<'w, 's, &'static ImpulseJoint>,
     pub timestep_mode: ResMut<'w, TimestepMode>,
+    pub salva_timestep: ResMut<'w, bevy_salva3d::plugin::TimestepMode>,
     pub selections: Res<'w, RobotSelection>,
     pub scene_window_data: Res<'w, SceneWindowData>,
     pub robot_materials: Res<'w, RobotMaterials>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
     pub parent: Query<'w, 's, &'static Parent>,
+    // Picking
+    pub movable_entity_picked: ResMut<'w, Events<MovableEntityPickedEvent>>,
+    pub unpick_events: Res<'w, Events<UnpickEvent>>,
+    // Transforms
     pub transforms: Query<'w, 's, &'static mut GlobalTransform, Without<Camera3d>>,
     pub local_transforms: Query<'w, 's, &'static mut Transform, Without<Camera3d>>,
+    // Simulation
     pub colliders: Query<'w, 's, (Entity, &'static mut Collider, Option<&'static Parent>)>,
+    pub fluids: Query<'w, 's, &'static mut FluidPositions>,
     pub visual_entities: Query<'w, 's, (Entity, Option<&'static Parent>), (With<VisualEntity>, With<GlobalTransform>)>,
+    // Inputs & ECS
     pub keyboard: Res<'w, ButtonInput<KeyCode>>,
     pub mouse: Res<'w, ButtonInput<MouseButton>>,
     pub commands: Commands<'w, 's>,
@@ -265,7 +275,7 @@ pub struct CameraQueryData {
 pub struct VisualEntity;
 
 pub trait View {
-    fn prepare(&mut self, _functional_ui_resources: &mut FunctionalUiResources) {}
+    fn prepare(&mut self, _functional_ui_resources: &mut FunctionalUiResources) -> Result<()> { Ok(()) }
 
     fn ui(&mut self, ui: &mut egui::Ui, commands: &mut Commands);
 
@@ -274,6 +284,8 @@ pub trait View {
     }
 
     fn functionality(&mut self, _functional_resources: &mut FunctionalUiResources) -> Result<()> { Ok(()) }
+
+    fn cleanup(&mut self, _functional_resources: &mut FunctionalUiResources) -> Result<()> { Ok(()) }
 }
 
 pub trait WindowUi: View {
@@ -366,6 +378,7 @@ macro_rules! drag_value_decimals {
 pub(crate) use drag_value;
 pub(crate) use drag_value_decimals;
 use robot_selection::RobotSelection;
+use crate::ui::toolbar::MovableEntityPickedEvent;
 
 pub fn robot_lab_ui(
     mut egui_ctxs: EguiContexts,
