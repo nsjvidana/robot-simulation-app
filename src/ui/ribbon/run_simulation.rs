@@ -3,7 +3,6 @@ use crate::ui::{drag_value, drag_value_decimals, FunctionalUiResources, View};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use bevy_rapier3d::plugin::TimestepMode;
-use bevy_rapier3d::prelude::SimulationToRenderTime;
 use derivative::Derivative;
 
 #[derive(Default)]
@@ -119,7 +118,7 @@ impl View for RunSimulationUi {
                 }
             }
             else if fps.changed() {
-                res.commands.insert_resource(Time::<Fixed>::from_hz(window.fps));
+                res.simulation_runner_parameters.frames_per_second = window.fps;
             }
         }
 

@@ -6,6 +6,7 @@ use bevy_rapier3d::plugin::systems::{writeback_rigid_bodies, RigidBodyWritebackC
 use bevy_rapier3d::prelude::*;
 use bevy_salva3d::fluid::{FluidAccelerations, FluidPositions, FluidVelocities};
 use bevy_salva3d::plugin::{DefaultSalvaContext, SalvaConfiguration, SalvaPhysicsPlugin};
+use derivative::Derivative;
 
 pub fn build_plugin(app: &mut App) {
     app.insert_resource(Time::<Fixed>::from_hz(60.));
@@ -37,7 +38,7 @@ pub fn build_plugin(app: &mut App) {
 
     app
         .init_resource::<ResetSimulationSnapshot>()
-        .init_resource::<SimRunnerState>();
+        .init_resource::<SimulationRunnerParameters>();
 
     app.add_systems(
         PostStartup,
@@ -74,22 +75,26 @@ pub struct ResetSimulationSnapshot {
     pub salva: Vec<u8>,
 }
 
-#[derive(Resource, Default)]
-struct SimRunnerState {
+#[derive(Resource, Derivative)]
+#[derivative(Default)]
+pub struct SimulationRunnerParameters {
+    #[derivative(Default(value = "60."))]
+    pub frames_per_second: f64,
     prev_state: SimulationState,
-    update_delta: f32,
+    sim_to_render_diff: f64,
 }
 
 /// Emulate a FixedUpdate for the physics schedule to prevent synchronization issues with UI changes.
 ///
 /// [`TimestepMode`] resource MUST be [`TimestepMode::Fixed`].
 pub fn simulation_runner(world: &mut World) {
-    let TimestepMode::Fixed { dt, .. } = world
-        .resource::<TimestepMode>()
-        .clone()
-    else { return; };
-
-    let prev_sim_state = world.resource::<SimRunnerState>().prev_state;
+    let (fixed_timestep_dt, prev_sim_state) = {
+        let res = world.resource::<SimulationRunnerParameters>();
+        let dt =
+            if res.frames_per_second != 0. { 1./res.frames_per_second }
+            else { 0. };
+        (dt,  res.prev_state)
+    };
     let sim_state = **world.resource::<State<SimulationState>>();
     let sim_state_changed = world.resource_mut::<State<SimulationState>>().is_changed();
 
@@ -104,16 +109,15 @@ pub fn simulation_runner(world: &mut World) {
     }
 
     let mut rapier_config = world.query_filtered::<&mut RapierConfiguration, With<DefaultRapierContext>>();
-    let mut salva_config = world.query_filtered::<&mut SalvaConfiguration, With<DefaultSalvaContext>>();
 
     let mut run_physics_schedule = |world: &mut World| {
-        let mut update_delta = world.resource::<SimRunnerState>().update_delta;
-            update_delta += world.resource::<Time>().delta_secs();
-        while update_delta > 0. {
+        let mut sim_to_render_diff = world.resource::<SimulationRunnerParameters>().sim_to_render_diff;
+            sim_to_render_diff += world.resource::<Time>().delta_secs_f64();
+        while sim_to_render_diff > 0. {
             world.run_schedule(PhysicsSchedule);
-            update_delta -= dt;
+            sim_to_render_diff -= fixed_timestep_dt;
         }
-        world.resource_mut::<SimRunnerState>().update_delta = update_delta;
+        world.resource_mut::<SimulationRunnerParameters>().sim_to_render_diff = sim_to_render_diff;
     };
 
     match sim_state {
@@ -204,7 +208,7 @@ pub fn simulation_runner(world: &mut World) {
         }
     }
 
-    world.resource_mut::<SimRunnerState>().prev_state = sim_state;
+    world.resource_mut::<SimulationRunnerParameters>().prev_state = sim_state;
 }
 
 fn on_enter_reset(world: &mut World) {

@@ -1,7 +1,7 @@
 use crate::functionality::motion_planning::wait::WaitInstruction;
 use crate::impl_instruction_window;
 use crate::ui::ribbon::motion_planning::InstructionInput;
-use crate::ui::{drag_value, NoOutput, View, WindowUi};
+use crate::ui::{NoOutput, View, WindowUi};
 use bevy::prelude::{Commands, Resource};
 use bevy_egui::egui;
 use bevy_egui::egui::Ui;

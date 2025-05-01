@@ -1,7 +1,7 @@
 use crate::error::error_handling_system;
 use crate::functionality::motion_planning::{AllInstructions, Plan};
 use crate::functionality::robot::{KinematicNode, RobotEntity, RobotMaterials, RobotQueryData, RobotSet};
-use crate::functionality::simulation::SimulationState;
+use crate::functionality::simulation::{SimulationRunnerParameters, SimulationState};
 use crate::prelude::*;
 use crate::ui::ribbon::motion_planning::ik::IkWindow;
 use crate::ui::ribbon::{fluids, Ribbon};
@@ -186,6 +186,7 @@ pub struct FunctionalUiResources<'w, 's> {
     pub kinematic_nodes: Query<'w, 's, (Entity, &'static KinematicNode)>,
     pub all_instructions: NonSend<'w, AllInstructions>,
     pub sim_state: Res<'w, State<SimulationState>>,
+    pub simulation_runner_parameters: ResMut<'w, SimulationRunnerParameters>,
     pub multibody_q: Query<'w, 's, &'static MultibodyJoint>,
     pub impulse_joint_q: Query<'w, 's, &'static ImpulseJoint>,
     pub timestep_mode: ResMut<'w, TimestepMode>,
