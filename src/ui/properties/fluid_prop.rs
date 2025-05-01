@@ -140,10 +140,12 @@ impl EntityProperty for FluidProperty {
         ui.strong("Nonpressure forces:");
         ui.group(|ui| {
             let mut forces = self.nonpressure_forces.lock();
-            for f in forces.iter_mut() {
-                ui.collapsing(f.force_name(), |ui| {
-                    f.ui(ui);
-                });
+            for (idx, f) in forces.iter_mut().enumerate() {
+                egui::CollapsingHeader::new(f.force_name())
+                    .id_salt(idx)
+                    .show(ui, |ui| {
+                        f.ui(ui);
+                    });
             }
         });
 
