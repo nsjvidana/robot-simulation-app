@@ -1,5 +1,6 @@
 pub mod physics_property;
 pub mod transform_prop;
+pub mod fluid_prop;
 
 use crate::ui::{RobotLabUiSet, View};
 use bevy::ecs::system::SystemParam;
