@@ -38,7 +38,6 @@ impl FromWorld for GenericObjSelection {
 
 pub fn select_generic_objects(
     selection: ResMut<GenericObjSelection>,
-    mut toolbar_window: ResMut<ToolbarWindow>,
     obj_names: Query<&Name, With<GenericObject>>,
     mut commands: Commands,
 ) {

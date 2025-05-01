@@ -6,11 +6,12 @@ use bevy_egui::egui::Ui;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
 use bevy_rapier3d::prelude::{ColliderMassProperties, MassProperties};
-use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSampling};
+use bevy_salva3d::rapier_integration::RapierColliderSampling;
 use crate::box_vec;
 use crate::functionality::simulation::SimulationState;
-use crate::ui::properties::{EntityPropertiesExt, TransformProperty};
+use crate::ui::properties::EntityPropertiesExt;
 use crate::ui::properties::physics_property::PhysicsProperty;
+use crate::ui::properties::transform_prop::TransformProperty;
 
 #[derive(Default)]
 pub struct PlaceObjectUi {
@@ -51,6 +52,7 @@ impl View for PlaceObjectUi {
             let coll = Collider::cuboid(0.5, 0.5, 0.5);
             commands
                 .spawn((
+                    Transform::default(),
                     Name::new("Cuboid"),
                     RigidBody::Dynamic,
                     ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
@@ -72,6 +74,7 @@ impl View for PlaceObjectUi {
             let coll = Collider::ball(0.5);
             commands
                 .spawn((
+                    Transform::default(),
                     Name::new("Ball"),
                     RigidBody::Dynamic,
                     ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
@@ -92,6 +95,7 @@ impl View for PlaceObjectUi {
             let coll = Collider::cone(0.5, 0.5);
             commands
                 .spawn((
+                    Transform::default(),
                     Name::new("Cone"),
                     RigidBody::Dynamic,
                     ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),
@@ -112,6 +116,7 @@ impl View for PlaceObjectUi {
             let coll = Collider::cylinder(0.5, 0.5);
             commands
                 .spawn((
+                    Transform::default(),
                     Name::new("Cylinder"),
                     RigidBody::Dynamic,
                     ColliderMassProperties::MassProperties(MassProperties::from_rapier(coll.raw.mass_properties(1.0))),

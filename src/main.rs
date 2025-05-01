@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy::DefaultPlugins;
 use bevy_flycam::{FlyCam, NoCameraPlayerPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::dynamics::RigidBody;
 use bevy_rapier3d::geometry::Collider;
 use bevy_rapier3d::prelude::RapierPickable;
@@ -27,7 +28,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins((
         DefaultPlugins,
-        // WorldInspectorPlugin::default(),
+        WorldInspectorPlugin::default(),
         RobotLabPlugin,
         RobotLabUiPlugin,
         InfiniteGridPlugin,

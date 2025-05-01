@@ -1,4 +1,5 @@
 pub mod physics_property;
+pub mod transform_prop;
 
 use crate::ui::{RobotLabUiSet, View};
 use bevy::ecs::system::SystemParam;
@@ -6,7 +7,7 @@ use bevy::prelude::*;
 use bevy_egui::egui::Ui;
 use bevy_egui::{egui, EguiContexts};
 use std::ops::{Deref, DerefMut};
-use bevy_rapier3d::prelude::{ColliderMassProperties, MassProperties, RigidBody};
+use bevy_rapier3d::prelude::{ColliderMassProperties, RigidBody};
 use bevy_salva3d::fluid::FluidPositions;
 use crate::ui::selecting::SceneWindowData;
 
@@ -65,50 +66,6 @@ impl Deref for EntityProperties {
 
 impl DerefMut for EntityProperties {
     fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-/// Global transform property
-pub struct TransformProperty {
-    pub transform: Transform,
-    pub scaling_options: Option<ScalingOptions>,
-}
-
-impl TransformProperty {
-    pub fn new() -> Self {
-        Self {
-            transform: Transform::IDENTITY,
-            scaling_options: None,
-        }
-    }
-}
-
-impl EntityProperty for TransformProperty {
-    fn prepare(&mut self, entity: Entity, res: &mut PropertyFunctionalityResources) {
-        self.transform = Transform::from(*res.global_transforms.get(entity).unwrap());
-    }
-
-    fn ui(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label("Translation: ");
-            ui.add(egui::DragValue::new(&mut self.transform.translation.x).min_decimals(3).speed(0.1));
-            ui.add(egui::DragValue::new(&mut self.transform.translation.y).min_decimals(3).speed(0.1));
-            ui.add(egui::DragValue::new(&mut self.transform.translation.z).min_decimals(3).speed(0.1));
-        });
-    }
-
-    fn functionality(&mut self, entity: Entity, res: &mut PropertyFunctionalityResources) {
-        *res.local_transforms
-            .get_mut(entity)
-            .unwrap() = self.transform
-            .with_scale(Vec3::ONE)
-            .into();
-    }
-
-    fn cleanup(&mut self, _entity: Entity, _res: &mut PropertyFunctionalityResources) {}
-
-    fn property_name(&self) -> &'static str {
-        "Transform"
-    }
 }
 
 pub struct ScalingOptions {
