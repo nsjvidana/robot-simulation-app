@@ -12,7 +12,7 @@ use bevy_rapier3d::prelude::{ColliderDebug, ColliderScale};
 use bevy_salva3d::plugin::{AppendNonPressureForces, SalvaPhysicsPlugin};
 use bevy_salva3d::salva::geometry::ParticlesContacts;
 use bevy_salva3d::salva::object::{Boundary, Fluid};
-use bevy_salva3d::salva::solver::{Akinci2013SurfaceTension, ArtificialViscosity, NonPressureForce};
+use bevy_salva3d::salva::solver::{Akinci2013SurfaceTension, ArtificialViscosity, Becker2009Elasticity, NonPressureForce};
 use bevy_salva3d::salva::TimestepManager;
 use bevy_salva3d::utils::cube_particle_positions;
 use parking_lot::{Mutex, MutexGuard};
@@ -170,11 +170,11 @@ impl EntityProperty for FluidProperty {
                             ));
                             force_was_picked = true;
                         }
-                        if ui.button("XSPH Viscosity").clicked() {
-                            todo!()
-                        }
                         if ui.button("Becker Elasticity").clicked() {
-                            todo!()
+                            forces.push(Box::new(
+                                Becker2009ElasticityInterface::new(100_000.0, 0.3, true)
+                            ));
+                            force_was_picked = true;
                         }
                     });
                     if force_was_picked {
@@ -399,6 +399,65 @@ impl NonpressureForceUi for Akinci2013SurfaceTensionInterface {
     }
 
     fn force_name(&self) -> &'static str { "Akinci Surface Tension" }
+}
+
+pub struct Becker2009ElasticityInterface {
+    force: Becker2009Elasticity,
+    young_modulus: Real,
+    poisson_ratio: Real,
+    nonlinear_strain: bool,
+}
+
+impl Becker2009ElasticityInterface {
+    pub fn new(young_modulus: Real, poisson_ratio: Real, nonlinear_strain: bool) -> Self {
+        Self {
+            force: Becker2009Elasticity::new(young_modulus, poisson_ratio, nonlinear_strain),
+            young_modulus,
+            poisson_ratio,
+            nonlinear_strain,
+        }
+    }
+}
+
+impl NonPressureForce for Becker2009ElasticityInterface {
+    fn solve(
+        &mut self,
+        timestep: &TimestepManager,
+        kernel_radius: bevy_salva3d::salva::math::Real,
+        fluid_fluid_contacts: &ParticlesContacts,
+        fluid_boundaries_contacts: &ParticlesContacts,
+        fluid: &mut Fluid,
+        boundaries: &[Boundary],
+        densities: &[bevy_salva3d::salva::math::Real]
+    ) {
+        self.force.solve(
+            timestep,
+            kernel_radius,
+            fluid_fluid_contacts,
+            fluid_boundaries_contacts,
+            fluid,
+            boundaries,
+            densities
+        );
+    }
+
+    fn apply_permutation(&mut self, permutation: &[usize]) {
+        self.force.apply_permutation(permutation);
+    }
+}
+
+impl NonpressureForceUi for Becker2009ElasticityInterface {
+    fn ui(&mut self, ui: &mut Ui) {
+        let young_modulus = display_val!(ui, "Young Modulus: ", self.young_modulus);
+        let poisson_ratio = display_val!(ui, "Poisson Ratio: ", self.poisson_ratio);
+        let nonlinear_strain = display_val!(ui, "Poisson Ratio: ", self.poisson_ratio);
+        let changed = young_modulus.changed() || poisson_ratio.changed() || nonlinear_strain.changed();
+        if changed {
+            self.force = Becker2009Elasticity::new(self.young_modulus, self.poisson_ratio, self.nonlinear_strain);
+        }
+    }
+
+    fn force_name(&self) -> &'static str { "Becker Elasticity" }
 }
 
 /// A NonpressureForce that has a Ui for editing the underlying force
