@@ -58,7 +58,7 @@ impl<'a, 's> EntityPropertiesExt for EntityCommands<'a> {
 }
 
 #[derive(Component)]
-pub struct EntityProperties(Vec<Box<dyn EntityProperty>>);
+pub struct EntityProperties(pub Vec<Box<dyn EntityProperty>>);
 
 impl Deref for EntityProperties {
     type Target = Vec<Box<dyn EntityProperty>>;
@@ -70,17 +70,15 @@ impl DerefMut for EntityProperties {
 }
 
 pub struct ScalingOptions {
-    pub non_negative_scale: bool,
+    pub positive_scale_only: bool,
     pub uniform_scale: bool,
-    pub uniform_scale_subdivisions: u32,
 }
 
 impl Default for ScalingOptions {
     fn default() -> Self {
         Self {
-            non_negative_scale: true,
-            uniform_scale: true,
-            uniform_scale_subdivisions: 16,
+            positive_scale_only: true,
+            uniform_scale: true
         }
     }
 }

@@ -65,7 +65,8 @@ impl View for PlaceObjectUi {
                     RapierColliderSampling::DynamicContact
                 ))
                 .insert_entity_properties(box_vec![
-                    TransformProperty::new(),
+                    TransformProperty::new()
+                        .with_scaling(true),
                     PhysicsProperty::new()
                 ])
                 .make_entity_pickable();
@@ -86,7 +87,8 @@ impl View for PlaceObjectUi {
                     GenericObject,
                 ))
                 .insert_entity_properties(box_vec![
-                    TransformProperty::new(),
+                    TransformProperty::new()
+                        .with_scaling(true),
                     PhysicsProperty::new()
                 ])
                 .make_entity_pickable();
@@ -107,7 +109,8 @@ impl View for PlaceObjectUi {
                     GenericObject,
                 ))
                 .insert_entity_properties(box_vec![
-                    TransformProperty::new(),
+                    TransformProperty::new()
+                        .with_scaling(true),
                     PhysicsProperty::new()
                 ])
                 .make_entity_pickable();
@@ -128,7 +131,8 @@ impl View for PlaceObjectUi {
                     GenericObject,
                 ))
                 .insert_entity_properties(box_vec![
-                    TransformProperty::new(),
+                    TransformProperty::new()
+                        .with_scaling(true),
                     PhysicsProperty::new()
                 ])
                 .make_entity_pickable();

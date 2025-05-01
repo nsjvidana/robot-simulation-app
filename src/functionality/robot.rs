@@ -22,10 +22,13 @@ use bevy_salva3d::rapier_integration::{ColliderSamplingMethod, RapierColliderSam
 use rapier3d_urdf::{UrdfJoint, UrdfJointHandle, UrdfLink, UrdfLoaderOptions, UrdfRobot, UrdfRobotHandles};
 use serde::{Deserialize, Serialize};
 use urdf_rs::{Geometry, Inertial, Joint, Pose};
+use crate::box_vec;
 use crate::error::{error_handling_system, Error};
 use crate::functionality::import::RobotJointType;
 use crate::prelude::*;
 use crate::prelude::Real;
+use crate::ui::properties::EntityProperties;
+use crate::ui::properties::transform_prop::TransformProperty;
 use crate::ui::VisualEntity;
 
 pub fn build_plugin(app: &mut App) {
@@ -243,6 +246,7 @@ pub fn init_robots(
                 RobotLinks(links),
                 RobotSetHandle(robot_set_idx),
                 Transform::from(transform),
+                EntityProperties(box_vec!(TransformProperty::new()))
             ));
     }
 
