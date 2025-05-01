@@ -5,7 +5,9 @@ use bevy::prelude::*;
 use bevy_rapier3d::geometry::VHACDParameters;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
 use std::fmt;
+use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
+use bevy_salva3d::rapier_integration::RapierColliderSampling;
 
 #[derive(Event)]
 pub struct ImportEvent {
@@ -13,10 +15,36 @@ pub struct ImportEvent {
     pub mesh_dir: PathBuf,
     pub urdf_loader_options: UrdfLoaderOptions,
     pub robot_joint_type: RobotJointType,
+    pub coll_sampling_method: FluidSamplingMethod,
     pub approximate_collisions: bool,
     pub convex_decomp_options: VHACDParameters,
     pub all_joints_have_motors: bool,
-    pub sampling_meth
+}
+
+#[derive(Default, PartialEq, Debug, Copy, Clone)]
+pub enum FluidSamplingMethod {
+    Static,
+    #[default]
+    DynamicContact,
+}
+
+impl fmt::Display for FluidSamplingMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            FluidSamplingMethod::Static => "Static",
+            FluidSamplingMethod::DynamicContact => "Dynamic Contact",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+impl Into<RapierColliderSampling> for FluidSamplingMethod {
+    fn into(self) -> RapierColliderSampling {
+        match self {
+            FluidSamplingMethod::Static => RapierColliderSampling::Static,
+            FluidSamplingMethod::DynamicContact => RapierColliderSampling::DynamicContact,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -37,7 +65,7 @@ impl fmt::Display for RobotJointType {
             RobotJointType::Multibody(_) => {"Multibody"}
             RobotJointType::Impulse => {"Impulse"}
         };
-        write!(f, "{name}")
+        write!(f, "{}", name)
     }
 }
 
@@ -88,6 +116,7 @@ pub fn import_robots(
             mesh_dir.to_path_buf(),
             event.urdf_loader_options,
             event.robot_joint_type,
+            event.coll_sampling_method.into(),
             rapier_robot,
         ));
     }

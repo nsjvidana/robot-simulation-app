@@ -56,9 +56,7 @@ impl View for PlaceObjectUi {
                     Mesh3d(meshes.add(Cuboid::new(1., 1., 1.))),
                     MeshMaterial3d(robot_materials.white_mat.clone()),
                     GenericObject,
-                    RapierColliderSampling {
-                        sampling_method: ColliderSamplingMethod::DynamicContact
-                    }
+                    RapierColliderSampling::DynamicContact
                 ))
                 .insert_entity_properties(box_vec![TransformProperty::new()])
                 .make_entity_pickable();

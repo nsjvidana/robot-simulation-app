@@ -4,7 +4,7 @@ use bevy_egui::egui;
 use bevy_rapier3d::na::{Isometry3, Vector3};
 use bevy_rapier3d::prelude::VHACDParameters;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfMultibodyOptions};
-use crate::functionality::import::{ImportEvent, RobotJointType};
+use crate::functionality::import::{FluidSamplingMethod, ImportEvent, RobotJointType};
 use crate::ui::View;
 
 #[derive(Default)]
@@ -41,6 +41,7 @@ pub struct ImportWindow {
     urdf_loader_options: UrdfLoaderOptions,
     mb_options: UrdfMultibodyOptions,
     robot_joint_type: RobotJointType,
+    collider_sampling_method: FluidSamplingMethod,
     approximate_collisions: bool,
     convex_decomp_options: VHACDParameters,
     all_joints_have_motors: bool,
@@ -62,6 +63,7 @@ impl Default for ImportWindow {
             },
             mb_options: UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
             robot_joint_type: Default::default(),
+            collider_sampling_method: FluidSamplingMethod::Static,
             approximate_collisions: true,
             convex_decomp_options: VHACDParameters {
                 resolution: 32,
@@ -107,7 +109,6 @@ impl View for ImportWindow {
                 }
             });
 
-        ui.checkbox(&mut self.urdf_loader_options.make_roots_fixed, "Make robot roots fixed");
         egui::ComboBox::from_label("Joint Solver Type")
             .selected_text(self.robot_joint_type.to_string())
             .show_ui(ui, |ui| {
@@ -122,12 +123,30 @@ impl View for ImportWindow {
                     "Impulse"
                 );
             });
+
+        egui::ComboBox::from_label("Collision Sampling Method")
+            .selected_text(self.collider_sampling_method.to_string())
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut self.collider_sampling_method,
+                    FluidSamplingMethod::Static,
+                    "Static"
+                );
+                ui.selectable_value(
+                    &mut self.collider_sampling_method,
+                    FluidSamplingMethod::DynamicContact,
+                    "Dynamic Contact"
+                );
+            });
+
+        ui.checkbox(&mut self.urdf_loader_options.make_roots_fixed, "Make robot roots fixed");
+
         let mut collide_with_self = self.mb_options != UrdfMultibodyOptions::DISABLE_SELF_CONTACTS;
         if ui.checkbox(&mut collide_with_self, "Collide with self").changed() {
             self.mb_options ^= UrdfMultibodyOptions::DISABLE_SELF_CONTACTS;
         }
-        ui.checkbox(&mut self.approximate_collisions, "Approximate collisions");
 
+        ui.checkbox(&mut self.approximate_collisions, "Approximate collisions");
         if self.approximate_collisions {
             ui.indent("coll_approx_params_indent", |ui| {
                 ui.collapsing("Collision Approximation Parameters", |ui| {
@@ -149,6 +168,7 @@ impl View for ImportWindow {
                 mesh_dir: PathBuf::from(self.mesh_dir.clone()),
                 urdf_loader_options: self.urdf_loader_options.clone(),
                 robot_joint_type: self.robot_joint_type,
+                coll_sampling_method: self.collider_sampling_method,
                 approximate_collisions: self.approximate_collisions,
                 convex_decomp_options: self.convex_decomp_options.clone(),
                 all_joints_have_motors: self.all_joints_have_motors,

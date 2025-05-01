@@ -100,6 +100,7 @@ pub struct RobotEntity {
     pub mesh_dir: PathBuf,
     pub loader_options: UrdfLoaderOptions,
     robot_joint_type: RobotJointType,
+    collider_sampling_method: RapierColliderSampling,
     rapier_robot: Option<UrdfRobot>,
 }
 
@@ -110,6 +111,7 @@ impl RobotEntity {
         mesh_dir: PathBuf,
         loader_options: UrdfLoaderOptions,
         robot_joint_type: RobotJointType,
+        collider_sampling_method: RapierColliderSampling,
         rapier_robot: UrdfRobot,
     ) -> Self {
         Self {
@@ -119,6 +121,7 @@ impl RobotEntity {
             mesh_dir,
             loader_options,
             robot_joint_type,
+            collider_sampling_method,
             rapier_robot: Some(rapier_robot),
         }
     }
@@ -520,9 +523,7 @@ fn create_rapier_robot_entities(
                 collider_components(coll, coll_handle),
                 RobotPart(robot_entity),
                 *context_link,
-                RapierColliderSampling {
-                    sampling_method: ColliderSamplingMethod::DynamicContact
-                }
+                robot.collider_sampling_method.clone()
             ))
                 .id();
             coll.user_data = coll_e.to_bits() as u128;
